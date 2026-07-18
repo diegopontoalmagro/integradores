@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rota de Integradores</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12161b;
+    --bg-alt:#171c22;
+    --surface:#1c232a;
+    --surface-hover:#232b33;
+    --border:#2a333c;
+    --border-soft:#212930;
+    --text:#eceef0;
+    --text-muted:#8b95a1;
+    --text-faint:#5c6672;
+    --s1:#5b8dbe;
+    --s1-soft:rgba(91,141,190,.14);
+    --s2:#e3a23c;
+    --s2-soft:rgba(227,162,60,.14);
+    --s3:#3fb6a8;
+    --s3-soft:rgba(63,182,168,.14);
+    --s4:#d4af37;
+    --s4-soft:rgba(212,175,55,.16);
+    --danger:#c75450;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1100px 500px at 12% -10%, rgba(91,141,190,.08), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(212,175,55,.05), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  h1,h2,h3{font-family:'Space Grotesk',sans-serif; margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+  ::selection{background:var(--s2-soft);}
+
+  /* ---------- layout shell ---------- */
+  #app{max-width:1180px; margin:0 auto; padding:28px 20px 80px;}
+
+  /* ---------- header ---------- */
+  .topbar{margin-bottom:22px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--s2); display:flex; align-items:center; gap:8px; margin-bottom:10px;
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--s2); box-shadow:0 0 0 3px var(--s2-soft);}
+  h1{font-size:clamp(28px,4vw,40px); font-weight:700; letter-spacing:-.02em;}
+  .tagline{color:var(--text-muted); font-size:14.5px; margin:8px 0 0; max-width:560px; line-height:1.5;}
+
+  /* ---------- dashboard ---------- */
+  .dashboard{
+    margin-top:24px; display:grid; grid-template-columns:repeat(5,1fr); gap:1px;
+    background:var(--border); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;
+  }
+  .tile{background:var(--surface); padding:16px 16px 14px;}
+  .tile .tlabel{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-faint); display:flex; align-items:center; gap:6px;}
+  .tile .tlabel .sw{width:8px;height:8px;border-radius:2px;}
+  .tile .tval{font-family:'Space Grotesk',sans-serif; font-size:26px; font-weight:700; margin-top:6px;}
+  .tile .tpct{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-faint); margin-top:2px;}
+  .tile .bar{height:4px; border-radius:2px; background:var(--border-soft); margin-top:10px; overflow:hidden;}
+  .tile .bar > i{display:block; height:100%; border-radius:2px; transition:width .5s cubic-bezier(.4,0,.2,1);}
+
+  /* ---------- controls ---------- */
+  .controls{display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; align-items:center;}
+  .search-wrap{position:relative; flex:1; min-width:220px;}
+  .search-wrap svg{position:absolute; left:12px; top:50%; transform:translateY(-50%); opacity:.45;}
+  input#search{
+    width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
+    border-radius:8px; padding:10px 12px 10px 36px; font-size:14px; font-family:'Inter',sans-serif;
+    outline:none; transition:border-color .15s;
+  }
+  input#search::placeholder{color:var(--text-faint);}
+  input#search:focus{border-color:var(--s1);}
+  .chips{display:flex; gap:6px; flex-wrap:wrap;}
+  .chip{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; padding:8px 12px; border-radius:8px;
+    background:var(--surface); border:1px solid var(--border); color:var(--text-muted); cursor:pointer;
+    white-space:nowrap; transition:all .15s;
+  }
+  .chip:hover{border-color:var(--text-faint); color:var(--text);}
+  .chip.active{background:var(--s1-soft); border-color:var(--s1); color:var(--text);}
+
+  /* ---------- body layout ---------- */
+  .layout{display:grid; grid-template-columns:200px 1fr; gap:26px; margin-top:26px; align-items:start;}
+  .city-nav{
+    position:sticky; top:20px; display:flex; flex-direction:column; gap:2px;
+    max-height:calc(100vh - 40px); overflow-y:auto; padding-right:6px;
+  }
+  .city-nav::-webkit-scrollbar{width:4px;}
+  .city-nav::-webkit-scrollbar-thumb{background:var(--border); border-radius:4px;}
+  .state-heading{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.12em; color:var(--text-faint);
+    text-transform:uppercase; margin:14px 0 6px; padding-left:10px;
+  }
+  .state-heading:first-child{margin-top:0;}
+  .nav-link{
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    padding:7px 10px; border-radius:7px; font-size:13px; color:var(--text-muted);
+    cursor:pointer; text-decoration:none; border:1px solid transparent;
+  }
+  .nav-link:hover{background:var(--surface); color:var(--text);}
+  .nav-link.hidden{display:none;}
+  .nav-link .nc{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--text-faint);}
+  .nav-link .progress-dot{width:6px;height:6px;border-radius:50%; background:var(--border); flex-shrink:0;}
+  .nav-link .progress-dot.has{background:var(--s1);}
+  .nav-link .progress-dot.done{background:var(--s4);}
+
+  main.route{min-width:0;}
+  .state-block{margin-bottom:6px;}
+  .state-title{
+    font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--text-faint);
+    font-family:'IBM Plex Mono',monospace; margin:30px 0 16px; display:flex; align-items:center; gap:12px;
+  }
+  .state-block:first-of-type .state-title{margin-top:0;}
+  .state-title::after{content:''; flex:1; height:1px; background:var(--border-soft);}
+
+  .route-line{position:relative; padding-left:22px;}
+  .route-line::before{
+    content:''; position:absolute; left:5px; top:8px; bottom:8px; width:1px;
+    background:linear-gradient(var(--border), var(--border) 92%, transparent);
+  }
+
+  .stop{position:relative; margin-bottom:8px;}
+  .stop-marker{
+    position:absolute; left:-22px; top:2px; width:11px; height:11px; border-radius:50%;
+    background:var(--bg); border:2px solid var(--text-faint);
+  }
+  .stop.open .stop-marker{border-color:var(--s2);}
+  .stop-head{
+    display:flex; align-items:baseline; gap:10px; cursor:pointer; padding:8px 0; user-select:none;
+  }
+  .stop-head h3{font-size:16.5px; font-weight:600;}
+  .stop-head .dist{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--s2); background:var(--s2-soft); padding:2px 7px; border-radius:20px;}
+  .stop-head .count{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-faint);}
+  .stop-head .chevron{margin-left:auto; color:var(--text-faint); transition:transform .2s; font-size:11px;}
+  .stop.collapsed .chevron{transform:rotate(-90deg);}
+  .stop.hidden{display:none;}
+
+  .contact-list{list-style:none; margin:0; padding:0 0 14px; display:flex; flex-direction:column; gap:1px;}
+  .stop.collapsed .contact-list{display:none;}
+
+  .contact-row{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    background:var(--surface); border:1px solid var(--border-soft); border-radius:8px;
+    padding:10px 12px; transition:border-color .15s;
+  }
+  .contact-row:hover{border-color:var(--border);}
+  .contact-row.hidden{display:none;}
+  .contact-row.done{background:linear-gradient(90deg, var(--s4-soft), var(--surface) 40%);}
+
+  .cinfo{min-width:0; flex:1;}
+  .cname{font-size:14px; font-weight:600; display:block; line-height:1.35;}
+  .cphone-row{display:flex; align-items:center; gap:6px; margin-top:3px;}
+  .cphone{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-muted); text-decoration:none;
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .cphone.wa:hover{color:var(--s3);}
+  .cphone svg{opacity:.55; flex-shrink:0;}
+  .cphone.wa:hover svg{opacity:1;}
+
+  .stage-track{display:flex; align-items:center; gap:6px; flex-shrink:0;}
+  .seg{
+    width:26px; height:26px; border-radius:6px; border:1px solid var(--border);
+    background:var(--bg-alt); color:var(--text-faint); font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:all .12s ease; position:relative;
+  }
+  .seg:hover{border-color:var(--text-faint); color:var(--text);}
+  .seg[data-active="1"][data-stage="1"]{background:var(--s1); border-color:var(--s1); color:#0d1216;}
+  .seg[data-active="1"][data-stage="2"]{background:var(--s2); border-color:var(--s2); color:#0d1216;}
+  .seg[data-active="1"][data-stage="3"]{background:var(--s3); border-color:var(--s3); color:#0d1216;}
+  .seg[data-active="1"][data-stage="4"]{background:var(--s4); border-color:var(--s4); color:#0d1216;}
+
+  .reset-btn{
+    width:22px; height:22px; border-radius:6px; border:1px solid transparent; background:transparent;
+    color:var(--text-faint); cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center;
+    opacity:0; transition:opacity .15s;
+  }
+  .contact-row:hover .reset-btn{opacity:1;}
+  .reset-btn:hover{color:var(--danger); border-color:var(--danger);}
+
+  .legend{
+    display:flex; gap:16px; flex-wrap:wrap; font-family:'IBM Plex Mono',monospace; font-size:11px;
+    color:var(--text-faint); margin-top:14px; padding:12px 14px; background:var(--surface);
+    border:1px solid var(--border-soft); border-radius:8px;
+  }
+  .legend span{display:flex; align-items:center; gap:6px;}
+  .legend i{width:9px;height:9px;border-radius:2px; display:inline-block;}
+
+  .empty-state{
+    text-align:center; padding:60px 20px; color:var(--text-faint); font-size:14px;
+  }
+
+  .save-toast{
+    position:fixed; bottom:18px; right:18px; background:var(--surface); border:1px solid var(--border);
+    padding:9px 14px; border-radius:8px; font-family:'IBM Plex Mono',monospace; font-size:12px;
+    color:var(--text-muted); display:flex; align-items:center; gap:8px; opacity:0; transform:translateY(8px);
+    transition:all .25s; pointer-events:none;
+  }
+  .save-toast.show{opacity:1; transform:translateY(0);}
+  .save-toast i{width:6px;height:6px;border-radius:50%; background:var(--s3); box-shadow:0 0 0 3px var(--s3-soft);}
+
+  .sync-badge{
+    display:inline-flex; align-items:center; gap:7px; font-family:'IBM Plex Mono',monospace; font-size:11px;
+    padding:6px 11px; border-radius:20px; border:1px solid var(--border); color:var(--text-faint);
+    background:var(--surface);
+  }
+  .sync-badge::before{content:''; width:7px; height:7px; border-radius:50%; background:var(--text-faint); flex-shrink:0;}
+  .sync-badge.ok::before{background:var(--s3); box-shadow:0 0 0 3px var(--s3-soft);}
+  .sync-badge.ok{color:var(--text-muted);}
+  .sync-badge.busy::before{background:var(--s2); box-shadow:0 0 0 3px var(--s2-soft); animation:pulse 1s infinite;}
+  .sync-badge.busy{color:var(--text-muted);}
+  .sync-badge.warn::before{background:var(--danger); box-shadow:0 0 0 3px rgba(199,84,80,.16);}
+  .sync-badge.warn{color:var(--text-muted);}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
+
+  @media (max-width:820px){
+    .layout{grid-template-columns:1fr;}
+    .city-nav{
+      position:static; flex-direction:row; overflow-x:auto; max-height:none; padding-bottom:6px;
+      gap:6px;
+    }
+    .state-heading{display:none;}
+    .nav-link{flex-shrink:0; border:1px solid var(--border);}
+    .dashboard{grid-template-columns:repeat(2,1fr);}
+    .contact-row{flex-wrap:wrap;}
+    .stage-track{margin-left:auto;}
+  }
+  @media (max-width:480px){
+    .dashboard{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <div class="eyebrow-row" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <div class="eyebrow"><span class="dot"></span>Rastreador de prospecção · PR / SP</div>
+      <span class="sync-badge" id="syncBadge">—</span>
+    </div>
+    <h1>Rota de Integradores</h1>
+    <p class="tagline">419 contatos organizados por proximidade a Foz do Iguaçu. Marque o progresso de cada empresa conforme a conversa avança.</p>
+
+    <div class="dashboard" id="dashboard"></div>
+
+    <div class="controls">
+      <div class="search-wrap">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="search" type="text" placeholder="Buscar por empresa ou cidade…" autocomplete="off">
+      </div>
+      <div class="chips" id="chips">
+        <div class="chip active" data-filter="all">Todos</div>
+        <div class="chip" data-filter="none">Sem contato</div>
+        <div class="chip" data-filter="progress">Em andamento</div>
+        <div class="chip" data-filter="done">Compra fechada</div>
+      </div>
+      <div class="chips">
+        <div class="chip" id="exportBtn" title="Baixar um arquivo com o progresso deste aparelho">⭳ Exportar progresso</div>
+        <label class="chip" for="importInput" title="Carregar um progresso exportado de outro aparelho" style="cursor:pointer;">⭱ Importar progresso</label>
+        <input type="file" id="importInput" accept="application/json" style="display:none;">
+      </div>
+    </div>
+
+    <p style="font-size:12px; color:var(--text-faint); margin:8px 0 0; font-family:'IBM Plex Mono',monospace;">
+      O progresso fica salvo neste aparelho. Para levar para o celular ou outro computador, exporte aqui e importe lá — a importação combina o progresso mais avançado de cada contato.
+    </p>
+
+    <div class="legend">
+      <span><i style="background:var(--s1)"></i>M — Mensagem enviada</span>
+      <span><i style="background:var(--s2)"></i>I — Demonstrou interesse</span>
+      <span><i style="background:var(--s3)"></i>R — Reunião marcada</span>
+      <span><i style="background:var(--s4)"></i>C — Compra fechada</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="city-nav" id="cityNav"></nav>
+    <main class="route" id="route"></main>
+  </div>
+
+</div>
+
+<div class="save-toast" id="saveToast"><i></i>Progresso salvo</div>
+
+<script id="raw-data" type="application/json">
+[{"id": "c1", "name": "MT Serviços", "phone": "+55 (45) 99811-4883", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c2", "name": "MN Soluções", "phone": "+55 (45) 98426-0517", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c3", "name": "Hard7 Soluções em Tecnologia da Informação", "phone": "+55 (45) 3027-7777", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c4", "name": "Carlos Câmeras", "phone": "+55 (45) 99964-2732", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c5", "name": "Seg Foz", "phone": "+55 (45) 99999-1535", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c6", "name": "NSEG Soluções em Tecnologia", "phone": "+55 (45) 98822-9175", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c7", "name": "Delta Segurança", "phone": "+55 (45) 99936-3982", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c8", "name": "Grupo Intersept (Monitoramento e Segurança)", "phone": "+55 (41) 4007-2640", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c9", "name": "ConnectFoz", "phone": "+55 (45) 99853-7701", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c10", "name": "Smart Grid Instalações Elétricas", "phone": "+55 (45) 99823-9976", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c11", "name": "JoyFibra (Integrador e ISP)", "phone": "+55 (45) 9820-8155", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c12", "name": "Purenet Internet e Comunicações", "phone": "+55 (45) 3523-9006", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c13", "name": "Grupo DPL", "phone": "+55 (45) 3029-8786", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c14", "name": "Cyber Informática Consultoria", "phone": "+55 (45) 3029-0484", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c15", "name": "ACByte", "phone": "+55 (45) 99934-5939", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c16", "name": "Progress TI – Tecnologia da Informação", "phone": "+55 (45) 99910-4117", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c17", "name": "Ula Tecnologia de Informação", "phone": "+55 (45) 3028-0215", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c18", "name": "Cpadi Soluções em TI", "phone": "+55 (45) 99102-1820", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c19", "name": "Luciano", "phone": "+55 (45) 99827-4573", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c20", "name": "Dominus (Claudio)", "phone": "+55 (45) 99807-7718", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c21", "name": "Cataratas NetNews (Celso)", "phone": "+55 (45) 98815-5011", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c22", "name": "VertiCall (Jaimilson)", "phone": "+55 (45) 3028-7068", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c23", "name": "Nel Tecnologia (Welligton Severo)", "phone": "+55 (45) 99137-8787", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c24", "name": "IntelFoz (Edson)", "phone": "+55 (45) 99905-3700", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c25", "name": "Configuri (Vinicius)", "phone": "+55 (45) 99820-0993", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c26", "name": "Marcos Tartaro", "phone": "+55 (45) 99988-0377", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c27", "name": "Ítalo Supermercado (Ronnie)", "phone": "+55 (46) 99106-2862", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c28", "name": "Epicentra (Victor)", "phone": "+55 (45) 99118-6368", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c29", "name": "INNERbit (Polega)", "phone": "+55 (45) 99915-0264", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c30", "name": "Elqit (Jonas Queiroga)", "phone": "+55 (45) 98829-4895", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c31", "name": "Monital Metropol (Renato)", "phone": "+55 (45) 98811-3339", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c32", "name": "Grupo DGG (Jhony)", "phone": "+55 (45) 99926-3097", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c33", "name": "Luciano, TI e Integrador", "phone": "+55 (45) 99988-6991", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c34", "name": "Garni (Clenio)", "phone": "+55 (45) 99971-0415", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c35", "name": "Info Clínica (Levistoni)", "phone": "+55 (45) 99118-2601", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c36", "name": "Atlanta Foz (Almir)", "phone": "+55 (45) 98809-4088", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c37", "name": "Pro Security (Ezzat Ahmad Gladtime)", "phone": "+55 (45) 99967-8577", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c38", "name": "Futura Telecomunicação (Thiago)", "phone": "+55 (45) 99960-8880", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c39", "name": "Jhon Informática (Jhon)", "phone": "+55 (45) 99938-0753", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c40", "name": "PowerNet (Ade)", "phone": "+55 (45) 99132-1011", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c41", "name": "Vinnicius Vieira", "phone": "+55 (45) 99818-2330", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c42", "name": "Rafael Sanches", "phone": "+55 (45) 99922-1460", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c43", "name": "BitWare (Jeam Poletto)", "phone": "+55 (45) 99948-1390", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c44", "name": "CompoClinic (Maicke)", "phone": "+55 (45) 99975-8404", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c45", "name": "NSoluções (Rafael)", "phone": "+55 (45) 98431-5852", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c46", "name": "GTech (Giovane)", "phone": "+55 (45) 99843-2177", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c47", "name": "JVT Tecnologia (Vitor)", "phone": "+55 (45) 92001-3219", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c48", "name": "Flávio Soluções (Flávio)", "phone": "+55 (45) 99134-1410", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c49", "name": "Eduardo", "phone": "+55 (45) 99429-9686", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c50", "name": "GMR Informática (Rafael)", "phone": "+55 (45) 99932-5060", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c51", "name": "ArchTec (Geraldo)", "phone": "+55 (45) 99964-9187", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c52", "name": "Romma Host (Ronald)", "phone": "+55 (45) 92000-5305", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c53", "name": "VLB Tecnologia (Vanderlei)", "phone": "+55 (45) 99967-6161", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c54", "name": "Net Station (Lauro)", "phone": "+55 (45) 99145-7027", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c55", "name": "Gabriel Almeida", "phone": "+55 (45) 99921-8946", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c56", "name": "Barth Informática (Vagner)", "phone": "+55 (45) 99999-5742", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c57", "name": "G Informática (Gerónimo Busse)", "phone": "+55 (45) 99969-7480", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c58", "name": "Wesley", "phone": "+55 (45) 99908-1620", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c59", "name": "Jota Jasper Tecnologia (Jota Jasper)", "phone": "+55 (45) 99945-8087", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c60", "name": "Clauber", "phone": "+55 (45) 99128-6879", "city": "Foz do Iguaçu", "dist": "0 km", "state": "PR"}, {"id": "c61", "name": "HBSeg Sistema de Segurança", "phone": "+55 (45) 99932-2561", "city": "Santa Terezinha de Itaipu", "dist": "~15 km", "state": "PR"}, {"id": "c62", "name": "MBR Soluções", "phone": "+55 (45) 99993-3952", "city": "Santa Terezinha de Itaipu", "dist": "~15 km", "state": "PR"}, {"id": "c63", "name": "New Oeste Informática LTDA", "phone": "+55 (45) 99831-1232", "city": "Santa Terezinha de Itaipu", "dist": "~15 km", "state": "PR"}, {"id": "c64", "name": "INNET Internet Fibra Óptica", "phone": "+55 (45) 3565-1256", "city": "São Miguel do Iguaçu", "dist": "~35 km", "state": "PR"}, {"id": "c65", "name": "AlfaNet Telecom", "phone": "+55 (45) 99917-1627", "city": "São Miguel do Iguaçu", "dist": "~35 km", "state": "PR"}, {"id": "c66", "name": "Set Telecom", "phone": "+55 (45) 98406-0245", "city": "São Miguel do Iguaçu", "dist": "~35 km", "state": "PR"}, {"id": "c67", "name": "Ellite Monitoramento Eletrônico", "phone": "+55 (45) 92000-6296", "city": "São Miguel do Iguaçu", "dist": "~35 km", "state": "PR"}, {"id": "c68", "name": "FamaTec Informática", "phone": "+55 (45) 98801-8832", "city": "São Miguel do Iguaçu", "dist": "~35 km", "state": "PR"}, {"id": "c69", "name": "Atlas Tech – Suporte Técnico", "phone": "+55 (45) 99810-8950", "city": "São Miguel do Iguaçu", "dist": "~35 km", "state": "PR"}, {"id": "c70", "name": "JR Informática", "phone": "+55 (45) 99800-4783", "city": "São Miguel do Iguaçu", "dist": "~35 km", "state": "PR"}, {"id": "c71", "name": "KSNET Telecom", "phone": "+55 (45) 3267-2212", "city": "Céu Azul", "dist": "~60 km", "state": "PR"}, {"id": "c72", "name": "Conecta Informática e Papelaria", "phone": "+55 (45) 3266-1214 / +55 (45) 99961-6427", "city": "Céu Azul", "dist": "~60 km", "state": "PR"}, {"id": "c73", "name": "Turbo 10 Telecom", "phone": "+55 (45) 99915-0245", "city": "Céu Azul", "dist": "~60 km", "state": "PR"}, {"id": "c74", "name": "ViarNet", "phone": "+55 (45) 3264-6307", "city": "Medianeira", "dist": "~70 km", "state": "PR"}, {"id": "c75", "name": "W_Tec Soluções em Informática", "phone": "+55 (45) 99978-0031", "city": "Medianeira", "dist": "~70 km", "state": "PR"}, {"id": "c76", "name": "YWE Tecnologia e Informática", "phone": "+55 (45) 3264-7299", "city": "Medianeira", "dist": "~70 km", "state": "PR"}, {"id": "c77", "name": "Elite Vigilância Eletrônica", "phone": "+55 (45) 99914-8583", "city": "Medianeira", "dist": "~70 km", "state": "PR"}, {"id": "c78", "name": "GuiaTech Informática", "phone": "+55 (45) 99804-4510", "city": "Medianeira", "dist": "~70 km", "state": "PR"}, {"id": "c79", "name": "Digitec", "phone": "+55 (45) 99998-1414", "city": "Medianeira", "dist": "~70 km", "state": "PR"}, {"id": "c80", "name": "Televideo Informática", "phone": "+55 (45) 3264-3972", "city": "Medianeira", "dist": "~70 km", "state": "PR"}, {"id": "c81", "name": "INFORMAT – Informática e Tecnologia", "phone": "+55 (45) 99849-1248", "city": "Matelândia", "dist": "~80 km", "state": "PR"}, {"id": "c82", "name": "Comnet Internet", "phone": "+55 (45) 99838-8731", "city": "Matelândia", "dist": "~80 km", "state": "PR"}, {"id": "c83", "name": "Beta Informática, Papelaria e Cursos", "phone": "+55 (45) 3262-3180", "city": "Matelândia", "dist": "~80 km", "state": "PR"}, {"id": "c84", "name": "Infotec Informática e Papelaria", "phone": "+55 (45) 99117-5830", "city": "Matelândia", "dist": "~80 km", "state": "PR"}, {"id": "c85", "name": "Alarmat Monitoramento", "phone": "+55 (45) 3262-3433", "city": "Matelândia", "dist": "~80 km", "state": "PR"}, {"id": "c86", "name": "NL Telecom", "phone": "+55 (45) 99858-5426", "city": "Matelândia", "dist": "~80 km", "state": "PR"}, {"id": "c87", "name": "Suportec Informática", "phone": "+55 (45) 3262-2828", "city": "Matelândia", "dist": "~80 km", "state": "PR"}, {"id": "c88", "name": "Dynamic Informática", "phone": "+55 (45) 99912-4898", "city": "Matelândia", "dist": "~80 km", "state": "PR"}, {"id": "c89", "name": "VisualNet", "phone": "+55 (45) 98433-6497", "city": "Matelândia", "dist": "~80 km", "state": "PR"}, {"id": "c90", "name": "PROSEG Monitoramento", "phone": "+55 (45) 99905-0031", "city": "Capitão Leônidas Marques", "dist": "~100 km", "state": "PR"}, {"id": "c91", "name": "Domus Telecom", "phone": "+55 800 648 1048", "city": "Marechal Cândido Rondon", "dist": "~110 km", "state": "PR"}, {"id": "c92", "name": "Exact On Informática Ltda", "phone": "+55 (45) 3055-3007", "city": "Toledo", "dist": "~130 km", "state": "PR"}, {"id": "c93", "name": "Astec Monitoramento – Segurança Eletrônica e Proteção 24h", "phone": "+55 (45) 3277-1425 / +55 (45) 9996-3938", "city": "Toledo", "dist": "~130 km", "state": "PR"}, {"id": "c94", "name": "Rk Segurança Eletrônica Ltda", "phone": "+55 (45) 99953-3338", "city": "Toledo", "dist": "~130 km", "state": "PR"}, {"id": "c95", "name": "Mercadão da Eletrônica", "phone": "+55 (45) 3252-4051", "city": "Toledo", "dist": "~130 km", "state": "PR"}, {"id": "c96", "name": "Suportech Informática", "phone": "+55 (45) 99818-0607", "city": "Toledo", "dist": "~130 km", "state": "PR"}, {"id": "c97", "name": "Piana Telecom", "phone": "+55 (45) 3053-1066 / +55 (45) 93300-1137", "city": "Toledo", "dist": "~130 km", "state": "PR"}, {"id": "c98", "name": "Toletec Segurança Eletrônica", "phone": "+55 (45) 2035-8821", "city": "Toledo", "dist": "~130 km", "state": "PR"}, {"id": "c99", "name": "CH Informática", "phone": "+55 (45) 3054-2267 / +55 (45) 99838-0033", "city": "Toledo", "dist": "~130 km", "state": "PR"}, {"id": "c100", "name": "Tech Nordic Assistência Especializada", "phone": "+55 (45) 2031-3935", "city": "Toledo", "dist": "~130 km", "state": "PR"}, {"id": "c101", "name": "Power Informática e Celulares", "phone": "+55 (45) 99901-0639", "city": "Toledo", "dist": "~130 km", "state": "PR"}, {"id": "c102", "name": "HB Informática Corporativa", "phone": "+55 (45) 99929-3005", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c103", "name": "Constel Tecnologia", "phone": "+55 (45) 2101-9100", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c104", "name": "JBTI – Tecnologia da Informação", "phone": "+55 (45) 99961-0349", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c105", "name": "Tecnovel Alarmes – Câmeras – Redes – Telefonia", "phone": "+55 (45) 99984-8175", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c106", "name": "Segtecne Sistemas", "phone": "+55 (45) 99830-2372", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c107", "name": "Proenerg Engenharia LTDA", "phone": "+55 (45) 3227-9494", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c108", "name": "Natan Informática", "phone": "+55 (45) 99921-3089", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c109", "name": "Inácio Fibra – Internet em Cascavel e Região Rural", "phone": "+55 (45) 3197-9710", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c110", "name": "Sul Digital Internet", "phone": "+55 (45) 98402-7528", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c111", "name": "Mundial Telecom", "phone": "+55 (45) 3197-2121", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c112", "name": "RPNET | Provedor de Internet", "phone": "+55 (45) 3324-6205", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c113", "name": "Telecom Cascavel", "phone": "+55 (45) 98404-8888", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c114", "name": "Ada Informática", "phone": "+55 (45) 3096-0920", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c115", "name": "Gênesis Sistemas Cftv e Telecom", "phone": "+55 (45) 99928-8951", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c116", "name": "Xelpon", "phone": "+55 (45) 3122-7838", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c117", "name": "Assistence Soluções em Informática", "phone": "+55 (45) 99981-8269", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c118", "name": "Fiberon Telecomunicações", "phone": "+55 (45) 3306-7255", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c119", "name": "Newtech Informática", "phone": "+55 (45) 99991-0246", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c120", "name": "Inovea Tecnologia", "phone": "+55 (45) 99106-5419", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c121", "name": "Vitech Alarmes", "phone": "+55 (45) 99844-5677", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c122", "name": "NS3 Soluções em Informática Redes e Infraestrutura de Servidores", "phone": "+55 (45) 99935-2299", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c123", "name": "TECFONE Telefonia e Segurança", "phone": "+55 (45) 99127-5192", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c124", "name": "GW Segurança Eletrônica", "phone": "+55 (45) 99851-0081", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c125", "name": "Top Sistemas de Segurança", "phone": "+55 (45) 99985-3273", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c126", "name": "G3 Informática & Tecnologia", "phone": "+55 (45) 99953-5602", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c127", "name": "Servin Tecnologia – Assistência Técnica em Informática", "phone": "+55 (45) 99108-0582", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c128", "name": "Datec Informática", "phone": "+55 (45) 99962-6643", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c129", "name": "Digytec Tecnologia", "phone": "+55 (45) 3112-4241 / +55 (45) 99911-2301", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c130", "name": "Conectavel Segurança Eletrônica Ltda", "phone": "+55 (45) 99116-0903", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c131", "name": "Conexão Sistemas de Segurança", "phone": "+55 (45) 98813-1608", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c132", "name": "Cercam Equipamentos de Segurança e Instalação", "phone": "+55 (45) 99814-7699", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c133", "name": "Gebecom Tecnologia", "phone": "+55 (45) 3226-9889 / +55 (45) 3226-0913", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c134", "name": "Barzotto Tec – Informática, Games, Tecnologia", "phone": "+55 (45) 98820-4884", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c135", "name": "Jonatas", "phone": "+55 (45) 99842-9799", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c136", "name": "PC Clinic (Jones)", "phone": "+55 (45) 3226-1564", "city": "Cascavel", "dist": "~140 km", "state": "PR"}, {"id": "c137", "name": "Pontocom Telecom", "phone": "+55 800 591 4101", "city": "Maripá", "dist": "~150 km", "state": "PR"}, {"id": "c138", "name": "FusãoNet Comunicação e Informática", "phone": "+55 (44) 3528-6256", "city": "Assis Chateaubriand", "dist": "~200 km", "state": "PR"}, {"id": "c139", "name": "Beltrãonet Telecom", "phone": "+55 (46) 3520-1500", "city": "Francisco Beltrão", "dist": "~200 km", "state": "PR"}, {"id": "c140", "name": "InfoServic", "phone": "+55 800 642 1835", "city": "Francisco Beltrão", "dist": "~200 km", "state": "PR"}, {"id": "c141", "name": "DEZ Telecom", "phone": "+55 800 115 1010", "city": "Francisco Beltrão", "dist": "~200 km", "state": "PR"}, {"id": "c142", "name": "JLX Telecom", "phone": "+55 (46) 3524-0684", "city": "Francisco Beltrão", "dist": "~200 km", "state": "PR"}, {"id": "c143", "name": "Act Tecnologia", "phone": "+55 (42) 3036-6200", "city": "Guarapuava", "dist": "~350 km", "state": "PR"}, {"id": "c144", "name": "JS Tecnologia", "phone": "+55 (42) 3304-5710", "city": "Guarapuava", "dist": "~350 km", "state": "PR"}, {"id": "c145", "name": "TECSEGUR – Sistemas de Segurança Eletrônica", "phone": "+55 (41) 99792-2341", "city": "Guarapuava", "dist": "~350 km", "state": "PR"}, {"id": "c146", "name": "Eletrosat Sistemas de Segurança", "phone": "+55 (42) 3627-1909", "city": "Guarapuava", "dist": "~350 km", "state": "PR"}, {"id": "c147", "name": "Grupo Blin – Segurança Eletrônica", "phone": "+55 (42) 99121-3844", "city": "Guarapuava", "dist": "~350 km", "state": "PR"}, {"id": "c148", "name": "Mservice", "phone": "+55 (42) 3622-1418", "city": "Guarapuava", "dist": "~350 km", "state": "PR"}, {"id": "c149", "name": "Brainpro Tecnologia", "phone": "+55 (42) 99151-0867", "city": "Guarapuava", "dist": "~350 km", "state": "PR"}, {"id": "c150", "name": "Palmasnet", "phone": "+55 (46) 3313-5040", "city": "Palmas", "dist": "~430 km", "state": "PR"}, {"id": "c151", "name": "Compustar (Maringá / Cianorte)", "phone": "Maringá: +55 (44) 3226-9742 / Cianorte: +55 (44) 3629-4679", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c152", "name": "Triax Tecnologia", "phone": "+55 (44) 3028-2826", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c153", "name": "Docutech Outsourcing de Impressão e T.I.", "phone": "+55 (44) 99985-3560", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c154", "name": "OFFICIAL TI", "phone": "+55 (44) 3052-8888", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c155", "name": "MOC Tecnologia", "phone": "+55 (44) 98854-8238", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c156", "name": "STMGO Tecnologias", "phone": "+55 (44) 3026-7597", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c157", "name": "VSX Networks", "phone": "+55 (44) 3309-4200", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c158", "name": "Singular Internet", "phone": "+55 (44) 99133-1011 / +55 (44) 3222-5505", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c159", "name": "BS2 Internet", "phone": "+55 (44) 3218-6300", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c160", "name": "Grupo Mega", "phone": "+55 (44) 3047-2012", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c161", "name": "Allnet Tecnologia (Allnet Soluções)", "phone": "+55 (44) 99991-2166", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c162", "name": "Tech Vantage", "phone": "+55 (44) 3101-0056", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c163", "name": "AngeliSeg – Segurança Eletrônica", "phone": "+55 (44) 99897-4015", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c164", "name": "HOSCORP Tecnologia", "phone": "+55 (44) 98454-4141", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c165", "name": "Origem Segurança Eletrônica Ltda", "phone": "+55 (44) 99976-5171", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c166", "name": "Net 1 Tecnologias", "phone": "+55 (44) 3226-9803 / +55 (44) 99118-4213", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c167", "name": "Neo Tecnologia da Informação Ltda", "phone": "+55 (44) 3029-6053", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c168", "name": "Tec Laser – Tecnologia", "phone": "+55 (44) 3041-9900 / +55 (44) 3028-4942", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c169", "name": "IC Tecnologia", "phone": "+55 (44) 98823-4455", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c170", "name": "ButanoNET", "phone": "+55 800 111 4040", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c171", "name": "Syma Solutions", "phone": "+55 (44) 4009-9090", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c172", "name": "Maringá T.I", "phone": "+55 (44) 99145-9973", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c173", "name": "Digital Sul Telecom", "phone": "+55 (44) 3269-6969", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c174", "name": "Distribuidora Nova Equipamentos de Segurança Eletrônica", "phone": "+55 (44) 3032-4501", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c175", "name": "Bitsafe Soluções em TI", "phone": "+55 (44) 3142-1019", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c176", "name": "Ingacom Telecom", "phone": "+55 (44) 3222-4999", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c177", "name": "Libratel Segurança Eletrônica", "phone": "+55 (44) 3226-8778", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c178", "name": "FabioSeg – Segurança Eletrônica", "phone": "+55 (44) 99867-2110", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c179", "name": "Datatel Tecnologia", "phone": "+55 (44) 3029-0987", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c180", "name": "F&T Soluções Inteligentes", "phone": "+55 (44) 3029-9553", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c181", "name": "Netcare Soluções em Redes", "phone": "+55 (44) 3200-2103", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c182", "name": "VXSEG Distribuidora", "phone": "+55 (44) 3028-4009", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c183", "name": "Intracom – Soluções em Tecnologia", "phone": "+55 (44) 98458-7751", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c184", "name": "InfoSystem TI & Informática", "phone": "+55 (44) 3028-0480", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c185", "name": "NEXTi – Núcleo de Excelência em Tecnologia da Informação", "phone": "+55 (44) 3304-1110", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c186", "name": "XKEY Soluções em Tecnologia da Informação", "phone": "+55 (44) 3026-0038", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c187", "name": "ServBank – Tecnologia da Informação", "phone": "+55 (44) 3031-6316", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c188", "name": "Eduardo Informática e Tecnologia", "phone": "+55 (44) 99761-6785", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c189", "name": "Vegasoft Tecnologia da Informação Ltda", "phone": "+55 (44) 99178-4309", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c190", "name": "Alasco Tecnologia da Informação", "phone": "+55 (44) 3034-8471", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c191", "name": "DC Tecnologia", "phone": "+55 (44) 99823-1682", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c192", "name": "MM Informática", "phone": "+55 (44) 3031-5647", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c193", "name": "AMTI – Inteligência em TI", "phone": "+55 (44) 4001-1710", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c194", "name": "TecMax Tecnologia da Informação (Energias Renováveis)", "phone": "+55 (44) 99143-9029", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c195", "name": "Informar – Assistência Técnica Ltda", "phone": "+55 (44) 3226-6115 / +55 (44) 98802-5040", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c196", "name": "CFA Tecnologia da Informação", "phone": "+55 (44) 3023-1329", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c197", "name": "Ômega Tecnologia e Serviços", "phone": "+55 (44) 3218-4500", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c198", "name": "Excelenti Soluções Digitais Ltda", "phone": "+55 (44) 98804-6116", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c199", "name": "Apoio Informática", "phone": "+55 (44) 99924-1430", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c200", "name": "ITO Informática", "phone": "+55 (44) 99951-3689", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c201", "name": "Diamante Informática e Assistência Técnica", "phone": "+55 (44) 99926-1763", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c202", "name": "HD Informática – Maringá", "phone": "+55 (44) 9955-2175", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c203", "name": "Alvorada Informática", "phone": "+55 (44) 99808-7224", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c204", "name": "M.A Informática", "phone": "+55 (44) 3023-2309", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c205", "name": "Master Informática", "phone": "+55 (44) 2103-7979", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c206", "name": "Aspen Informática", "phone": "+55 (44) 4009-1900", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c207", "name": "T7 Flex Informática", "phone": "+55 (44) 99807-8938", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c208", "name": "Positech Informática", "phone": "+55 (44) 3031-1661", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c209", "name": "Nikkey Informática Ltda", "phone": "+55 (44) 3029-7885 / +55 (44) 99858-3330", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c210", "name": "Balbi Informática", "phone": "+55 (44) 99109-4058", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c211", "name": "Preech Informática", "phone": "+55 (44) 3046-0557 / +55 (44) 99874-5115", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c212", "name": "CD Informática", "phone": "+55 (44) 3262-2977", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c213", "name": "SS do Brasil Informática", "phone": "+55 (44) 99719-0892", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c214", "name": "JP Suprimentos e Informática", "phone": "+55 (44) 3025-6550", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c215", "name": "JL Eletrônica e Informática", "phone": "+55 (44) 99852-2235", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c216", "name": "Lider Informática Eletrônica", "phone": "+55 (44) 3028-7405", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c217", "name": "HCI Informática", "phone": "+55 (44) 3224-9549 / +55 (44) 99147-7327", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c218", "name": "Potencial – Suprimentos de Informática Pantum", "phone": "+55 (44) 3267-5555", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c219", "name": "WSI Informática", "phone": "+55 (44) 99963-8869", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c220", "name": "Tecdados Informática", "phone": "+55 (44) 99117-0043", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c221", "name": "Support Informática", "phone": "+55 (44) 3028-7100", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c222", "name": "Mercadão da Informática", "phone": "+55 (44) 99735-5654", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c223", "name": "Azzoni Informática", "phone": "+55 (44) 99881-5697", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c224", "name": "Segura Informática", "phone": "+55 (44) 99843-1110", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c225", "name": "Maringá Informática", "phone": "+55 (44) 99920-1865", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c226", "name": "Fênix Informática", "phone": "+55 (44) 99721-0085", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c227", "name": "Técnica Informática", "phone": "+55 (44) 98422-7404", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c228", "name": "Primus Informática", "phone": "+55 (44) 3041-0606 / +55 (44) 98405-1515", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c229", "name": "JP Tecnologia e Informática – Assistência Técnica", "phone": "+55 (44) 98833-4466", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c230", "name": "Ribeirotech Informática", "phone": "+55 (44) 99103-0168", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c231", "name": "Ti Linux Informática", "phone": "+55 (44) 99804-5495 (Eduardo) / +55 (44) 99139-4311 (Anderson)", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c232", "name": "Alfa Informática", "phone": "+55 (44) 99806-2213", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c233", "name": "MSILVA TECH Informática", "phone": "+55 (44) 3255-1227", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c234", "name": "Me Socorre Informática", "phone": "+55 (44) 3026-4459 / +55 (44) 99944-0600", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c235", "name": "Jartech Informática", "phone": "+55 (44) 99960-9376", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c236", "name": "Digicampo Tecnologia em Informática", "phone": "+55 (44) 3031-6070", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c237", "name": "Pronto Informática", "phone": "+55 (44) 3046-4080", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c238", "name": "RGK4IT – Exata TI", "phone": "+55 (44) 3032-8400", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c239", "name": "TI inFoco – Soluções em Informática", "phone": "+55 (44) 99900-5988", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c240", "name": "MK Tech – Suporte em TI e Consultoria", "phone": "+55 (44) 99175-7158", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c241", "name": "Endy TI – Soluções Inteligentes em Informática", "phone": "+55 (44) 3112-0617 / +55 (44) 99871-0638", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c242", "name": "Noc T.I. Soluções", "phone": "+55 (44) 3301-7850", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c243", "name": "Marcelo's Ti. Informática", "phone": "+55 (44) 98847-4206", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c244", "name": "Maringá Bulls Informática", "phone": "+55 (43) 99113-4480", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c245", "name": "GetTI Services – Data Center", "phone": "+55 (44) 3269-7857 / +55 (44) 3023-0062", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c246", "name": "Telnet Telecom", "phone": "+55 (44) 3041-8500", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c247", "name": "RedeEletric", "phone": "+55 (44) 3288-1173", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c248", "name": "Maxxi Pabx Telecomunicações", "phone": "+55 (44) 3026-5511", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c249", "name": "Smart House Maringá", "phone": "+55 (44) 99164-9647", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c250", "name": "ConectWi – Soluções em Wireless e Fibra Óptica", "phone": "+55 (44) 3024-6464", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c251", "name": "Ingá Eletroseg Ltda", "phone": "+55 (44) 4141-5270", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c252", "name": "JSA Consultoria (Jeferson)", "phone": "+55 (44) 98802-4260", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c253", "name": "MTI Solutions (Clefferson)", "phone": "+55 (44) 3026-3340", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c254", "name": "NT Solutions (Tiago)", "phone": "+55 (44) 99809-6747", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c255", "name": "KS Telecomunicações (Carlinhos)", "phone": "+55 (44) 98819-4500", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c256", "name": "Vext TI (Rodrigo Guedes)", "phone": "+55 (44) 99941-3226", "city": "Maringá", "dist": "~480 km", "state": "PR"}, {"id": "c257", "name": "TI inFoco – Soluções em Informática", "phone": "+55 (44) 99900-5988", "city": "Sarandi", "dist": "~485 km", "state": "PR"}, {"id": "c258", "name": "Microlex Sistemas e Equip. Informática Ltda", "phone": "+55 (44) 99963-1601", "city": "Sarandi", "dist": "~485 km", "state": "PR"}, {"id": "c259", "name": "LStech", "phone": "+55 (44) 99932-7279", "city": "Sarandi", "dist": "~485 km", "state": "PR"}, {"id": "c260", "name": "Polo Computer Center", "phone": "+55 (44) 99714-9398", "city": "Sarandi", "dist": "~485 km", "state": "PR"}, {"id": "c261", "name": "ViniSky", "phone": "+55 (44) 99806-2038", "city": "Sarandi", "dist": "~485 km", "state": "PR"}, {"id": "c262", "name": "A F de Souza – Informática", "phone": "+55 (44) 99820-9291", "city": "Sarandi", "dist": "~485 km", "state": "PR"}, {"id": "c263", "name": "Master BSS Informática", "phone": "+55 (44) 99712-9971", "city": "Astorga", "dist": "~490 km", "state": "PR"}, {"id": "c264", "name": "Matrix Informática", "phone": "+55 (44) 3234-7430", "city": "Astorga", "dist": "~490 km", "state": "PR"}, {"id": "c265", "name": "TK Informática", "phone": "+55 (44) 99887-6344", "city": "Astorga", "dist": "~490 km", "state": "PR"}, {"id": "c266", "name": "D7 Segurança Eletrônica", "phone": "+55 (44) 99748-4759", "city": "Astorga", "dist": "~490 km", "state": "PR"}, {"id": "c267", "name": "Info House Brasil", "phone": "+55 (44) 3234-6885", "city": "Astorga", "dist": "~490 km", "state": "PR"}, {"id": "c268", "name": "Nan o' Tech", "phone": "+55 (44) 99718-5175", "city": "Astorga", "dist": "~490 km", "state": "PR"}, {"id": "c269", "name": "KTi Tecnologia", "phone": "+55 (44) 3247-8125", "city": "Santa Fé", "dist": "~495 km", "state": "PR"}, {"id": "c270", "name": "IW Multi Soluções – Provedor Internet", "phone": "+55 (44) 3245-1890 / +55 (44) 92002-3669", "city": "Mandaguaçu", "dist": "~500 km", "state": "PR"}, {"id": "c271", "name": "Mmer Provedor de Internet", "phone": "+55 (44) 3245-2780", "city": "Mandaguaçu", "dist": "~500 km", "state": "PR"}, {"id": "c272", "name": "BTech Informática e Segurança", "phone": "+55 (44) 99934-9259", "city": "Mandaguaçu", "dist": "~500 km", "state": "PR"}, {"id": "c273", "name": "Prodasp Informática Ltda", "phone": "+55 (44) 3222-6622", "city": "Mandaguaçu", "dist": "~500 km", "state": "PR"}, {"id": "c274", "name": "Rossi Informática", "phone": "+55 (44) 3245-5593", "city": "Mandaguaçu", "dist": "~500 km", "state": "PR"}, {"id": "c275", "name": "Datasiga Engenharia de Redes", "phone": "+55 (42) 3222-4190", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c276", "name": "A3A Engenharia de Sistemas", "phone": "+55 (42) 3025-4230", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c277", "name": "FOMP Tecnologia", "phone": "+55 (42) 99155-3313", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c278", "name": "802 BR Teleinformática", "phone": "+55 (42) 99919-2373", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c279", "name": "MTS Tech – Soluções em Segurança Eletrônica e Tecnologia", "phone": "+55 (42) 99163-8854", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c280", "name": "ARN Sistemas Segurança Eletrônica", "phone": "+55 (42) 99813-8936", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c281", "name": "Mtec Serviços", "phone": "+55 (42) 99825-0333", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c282", "name": "Klop Soluções em TI", "phone": "+55 (42) 3025-1013", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c283", "name": "RM Infotech", "phone": "+55 (42) 99968-1782", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c284", "name": "Key Tecnologia", "phone": "+55 (42) 99818-6121", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c285", "name": "Tech4House", "phone": "+55 (42) 99865-0767", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c286", "name": "IVM Engenharia Elétrica", "phone": "+55 (42) 99863-9266", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c287", "name": "Inside Technology", "phone": "+55 (42) 99136-6152", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c288", "name": "Intelponta", "phone": "+55 (42) 99803-2363", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c289", "name": "SMR Automação & Segurança Eletrônica", "phone": "+55 (42) 99802-5602", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c290", "name": "Alarmes Tele Prince", "phone": "+55 (42) 99973-9034", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c291", "name": "Netfish Serviços", "phone": "+55 (42) 99967-9569", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c292", "name": "Genius Telecom", "phone": "+55 800 878 8813", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c293", "name": "Dbug", "phone": "+55 800 100 0100 / +55 (42) 3252-8383", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c294", "name": "Intercomm Fibra", "phone": "+55 (42) 3302-8252 / +55 (42) 8419-2868", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c295", "name": "Fiber Giga – Internet", "phone": "+55 (42) 99103-8361", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c296", "name": "Centroseg Alarmes Monitorados e Portaria Remota", "phone": "+55 (42) 3028-8203", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c297", "name": "Confiare Sistemas de Alarme", "phone": "+55 (42) 99117-3461", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c298", "name": "Aquamaris – Casa e Segurança", "phone": "+55 (42) 3225-7540", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c299", "name": "Cybervia Internet Ltda", "phone": "+55 (42) 99910-0273", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c300", "name": "LUZZ Internet", "phone": "+55 (42) 99111-1708", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c301", "name": "Orion Fibra", "phone": "+55 (42) 99836-0138", "city": "Ponta Grossa", "dist": "~500 km", "state": "PR"}, {"id": "c302", "name": "VJP Informática", "phone": "+55 (44) 99865-3663", "city": "Mandaguari", "dist": "~510 km", "state": "PR"}, {"id": "c303", "name": "InfoKing Informática Especializada (Claudemir)", "phone": "+55 (44) 99145-4825", "city": "Mandaguari", "dist": "~510 km", "state": "PR"}, {"id": "c304", "name": "Infuz TI", "phone": "+55 (44) 98813-4392", "city": "Mandaguari", "dist": "~510 km", "state": "PR"}, {"id": "c305", "name": "Mazeto Tecnologia", "phone": "+55 (44) 99840-5421", "city": "Mandaguari", "dist": "~510 km", "state": "PR"}, {"id": "c306", "name": "Rede Tell Informática", "phone": "+55 (44) 3133-2000 / +55 (44) 99969-0581", "city": "Mandaguari", "dist": "~510 km", "state": "PR"}, {"id": "c307", "name": "ASL Telecomunicações", "phone": "+55 (44) 3233-0287", "city": "Mandaguari", "dist": "~510 km", "state": "PR"}, {"id": "c308", "name": "Logy Informática Ltda", "phone": "+55 (44) 99815-8787", "city": "Mandaguari", "dist": "~510 km", "state": "PR"}, {"id": "c309", "name": "Vibe Informática", "phone": "+55 (44) 3233-1282 / +55 (44) 99916-5210", "city": "Mandaguari", "dist": "~510 km", "state": "PR"}, {"id": "c310", "name": "Imperatriz Segurança Eletrônica", "phone": "+55 (44) 99825-3263", "city": "Mandaguari", "dist": "~510 km", "state": "PR"}, {"id": "c311", "name": "iSUPER Internet", "phone": "+55 (44) 3232-8300 / +55 800 648 3028", "city": "Marialva", "dist": "~515 km", "state": "PR"}, {"id": "c312", "name": "DSI Tecnologia", "phone": "+55 (44) 99847-6847", "city": "Marialva", "dist": "~515 km", "state": "PR"}, {"id": "c313", "name": "Tecmicro Digital", "phone": "+55 (44) 3015-2842", "city": "Marialva", "dist": "~515 km", "state": "PR"}, {"id": "c314", "name": "Solutec Soluções em Segurança e Tecnologia", "phone": "+55 (44) 99884-2584", "city": "Marialva", "dist": "~515 km", "state": "PR"}, {"id": "c315", "name": "Dolci Informática", "phone": "+55 (44) 3015-2587", "city": "Marialva", "dist": "~515 km", "state": "PR"}, {"id": "c316", "name": "Matec Informática", "phone": "+55 (44) 3040-7528", "city": "Marialva", "dist": "~515 km", "state": "PR"}, {"id": "c317", "name": "Zen Server Soluções", "phone": "+55 (44) 99769-3320", "city": "Marialva", "dist": "~515 km", "state": "PR"}, {"id": "c318", "name": "HashTech Soluções em Tecnologia da Informação", "phone": "+55 (43) 99861-3596", "city": "Cambira", "dist": "~525 km", "state": "PR"}, {"id": "c319", "name": "Cyber Informática", "phone": "+55 (43) 99635-9606", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c320", "name": "Nossa Provedor de Internet", "phone": "+55 800 920 1000 / +55 (43) 3771-6515", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c321", "name": "GPR Digital – Londrina", "phone": "+55 (43) 3032-6176", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c322", "name": "Seglon Segurança Eletrônica", "phone": "+55 (43) 3354-9544 / +55 (43) 98485-8543", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c323", "name": "Elite Segurança Londrina", "phone": "+55 800 652 1463", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c324", "name": "London Vigilância Patrimonial", "phone": "+55 (43) 3771-2721", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c325", "name": "Infotec Informática", "phone": "+55 (43) 3771-3184 / +55 (43) 99162-0239", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c326", "name": "Max Cabo Telecomunicações", "phone": "+55 (43) 3033-3336", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c327", "name": "Multcabos – Redes e Telecom", "phone": "+55 (43) 3305-7777", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c328", "name": "Telseg Telecom", "phone": "+55 (43) 3305-7290", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c329", "name": "Londrinet Provedor de Internet Fibra Óptica", "phone": "+55 800 234 0000", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c330", "name": "DN Conectividade Ltda", "phone": "+55 (43) 3878-7676", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c331", "name": "K1 Soluções em Telecomunicações", "phone": "+55 (43) 3029-0029 / +55 (43) 98813-2063", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c332", "name": "Salomon Informática Corporativo", "phone": "+55 (43) 2101-4350 / +55 (43) 98828-6435", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c333", "name": "Paraná T.I. – Soluções Integradas", "phone": "+55 (43) 3322-8700", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c334", "name": "Neosystem – Controle de Acesso, Câmeras e Portão Eletrônico", "phone": "+55 (43) 3337-6164", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c335", "name": "Sage Link Internet", "phone": "+55 (43) 3398-9378", "city": "Londrina", "dist": "~540 km", "state": "PR"}, {"id": "c336", "name": "Prata Telecom", "phone": "+55 (43) 99151-2807", "city": "Primeiro de Maio", "dist": "~550 km", "state": "PR"}, {"id": "c337", "name": "Solução Network – Internet Fibra Óptica", "phone": "+55 (44) 3900-0000", "city": "Paranavaí", "dist": "~570 km", "state": "PR"}, {"id": "c338", "name": "Grupo Lasetronik", "phone": "+55 (41) 99134-0448", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c339", "name": "Uniteelcom", "phone": "+55 (41) 3376-3440", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c340", "name": "Setup Consultoria e Suporte em TI", "phone": "+55 (41) 99192-9008", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c341", "name": "Gava Informática", "phone": "+55 (41) 3354-4666", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c342", "name": "CCLINK Tecnologia", "phone": "+55 (41) 99533-3763", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c343", "name": "JoBBox It Soluções Tecnológicas", "phone": "+55 (41) 3149-4645", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c344", "name": "MS Fiber – Soluções Integradas em Tecnologia", "phone": "+55 (41) 3501-9833", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c345", "name": "Fast Power Informática", "phone": "+55 (41) 3345-1848 / +55 (41) 98423-8798", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c346", "name": "Amparo Técnico", "phone": "+55 (41) 3798-4005", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c347", "name": "Fxcom Soluções Inteligentes", "phone": "+55 (41) 99704-3096", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c348", "name": "MSNetworks Tecnologia da Informação Ltda", "phone": "+55 (41) 99243-0919", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c349", "name": "Tribe Tecnologia", "phone": "+55 (41) 3023-6311", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c350", "name": "Ampla Soluções Integradas Ltda", "phone": "+55 (41) 99928-2730", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c351", "name": "Paraná-Tel Telecom", "phone": "+55 (41) 3883-5050", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c352", "name": "Dvs Segurança", "phone": "+55 (41) 3521-0845", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c353", "name": "CSS Telecomunicações", "phone": "+55 (41) 3089-0998 / +55 (41) 99722-1822", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c354", "name": "Licita Premier Representações", "phone": "+55 (41) 3798-1936", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c355", "name": "Install Tech Ltda", "phone": "+55 (41) 99272-1845", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c356", "name": "Conect Informática", "phone": "+55 (41) 99124-4237", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c357", "name": "Soow Sigma", "phone": "+55 (41) 3360-6677", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c358", "name": "TS Telecom", "phone": "+55 (41) 3514-9000", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c359", "name": "Jumper Informática Curitiba", "phone": "+55 (41) 99602-9868", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c360", "name": "Conecte Plus Teleinformática", "phone": "+55 (41) 99982-4443", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c361", "name": "ISF Soluções em Segurança", "phone": "+55 (41) 3378-7933", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c362", "name": "Panopticom Tecnologia e Segurança", "phone": "+55 (41) 99840-8530", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c363", "name": "GHR Alarmes e Monitoramento", "phone": "+55 (41) 99166-7858", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c364", "name": "Folk Portaria Remota", "phone": "+55 (41) 3114-0807", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c365", "name": "FF Network Soluções Integradas", "phone": "+55 (41) 3542-4916", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c366", "name": "Setel", "phone": "+55 (41) 3222-3224", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c367", "name": "Telecontrol Instalações de Redes", "phone": "+55 (41) 3015-5718", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c368", "name": "Golden Telecom", "phone": "+55 (41) 3074-0702", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c369", "name": "Jordan Telecomunicações", "phone": "+55 (41) 3266-3488", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c370", "name": "Soluredes Tecnologia", "phone": "+55 (41) 3073-1133", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c371", "name": "TZ Conectividade", "phone": "+55 (41) 3053-0300", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c372", "name": "SHCOMP TI e Telecom", "phone": "+55 (41) 4063-7636", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c373", "name": "Davet Soluções em TI", "phone": "+55 (41) 3300-0770", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c374", "name": "Equalize IT Solutions", "phone": "+55 (41) 3542-1090", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c375", "name": "TM Telecom", "phone": "+55 (41) 3365-1600", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c376", "name": "A7 Technology", "phone": "+55 (41) 3312-8000", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c377", "name": "Teletex IT Solutions", "phone": "+55 (41) 2169-7777 / +55 (41) 99193-1264", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c378", "name": "X-link – Central Telefônica PABX / Soluções em TI", "phone": "+55 (41) 3076-8008", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c379", "name": "ColumbiaTI – Consultoria e Terceirização de TI", "phone": "+55 (41) 3022-4080", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c380", "name": "Pelissari Gestão e Tecnologia", "phone": "+55 (41) 3340-1100", "city": "Curitiba", "dist": "~640 km", "state": "PR"}, {"id": "c381", "name": "Clipcel Tecnologia", "phone": "+55 (41) 99503-4635", "city": "Matinhos", "dist": "~680 km", "state": "PR"}, {"id": "c382", "name": "System Frame", "phone": "+55 (11) 99586-5501", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c383", "name": "Net4Guest", "phone": "+55 (11) 5574-7785", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c384", "name": "Megavig", "phone": "+55 (11) 5051-0800 / +55 (11) 5053-5320", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c385", "name": "Astel Line Telecomunicações", "phone": "+55 (11) 3975-1842", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c386", "name": "XOX Telecom", "phone": "+55 (11) 93016-9509", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c387", "name": "Grupo V3 Connect", "phone": "+55 (11) 4858-3396", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c388", "name": "Dinâmica Informática e Telecomunicações", "phone": "+55 (11) 2225-8800", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c389", "name": "Wan TI – Cabeamento Estruturado e Suporte de Redes", "phone": "+55 (11) 99676-6766", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c390", "name": "Soma Tecnologias", "phone": "+55 (11) 99196-6641", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c391", "name": "Conect Cabeamento", "phone": "+55 (11) 96369-6430", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c392", "name": "Amax Cabeamento Estruturado", "phone": "+55 (11) 94247-5224", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c393", "name": "Enservice Informática & Automação", "phone": "+55 (11) 97438-5556", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c394", "name": "Elitte Tecnologia", "phone": "+55 (11) 3090-9370", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c395", "name": "Mscti Tecnologia e Internet", "phone": "+55 (11) 2305-7197", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c396", "name": "Stel Sistemas", "phone": "+55 (11) 2464-970", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c397", "name": "OneIT", "phone": "+55 (11) 3774-3711", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c398", "name": "D2W Engenharia", "phone": "+55 (11) 94145-9902", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c399", "name": "Grupo King Tech", "phone": "+55 (11) 93209-0367", "city": "São Paulo", "dist": "~1.000 km", "state": "SP"}, {"id": "c400", "name": "Panda Internet Fibra", "phone": "+55 (11) 4380-7748", "city": "Santo André", "dist": "~1.005 km", "state": "SP"}, {"id": "c401", "name": "Tech Rede – Soluções de Telecom", "phone": "+55 (11) 93264-9289", "city": "Indaiatuba", "dist": "~1.070 km", "state": "SP"}, {"id": "c402", "name": "NovumNet – Acesso à Internet", "phone": "+55 (19) 3809-7067", "city": "Hortolândia", "dist": "~1.080 km", "state": "SP"}, {"id": "c403", "name": "Ubby Internet", "phone": "+55 (19) 3199-7222", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c404", "name": "Starcamp – Internet Fibra Óptica", "phone": "+55 (19) 98205-8848", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c405", "name": "Ticamp Tecnologia da Informação", "phone": "+55 (19) 3741-9900 / +55 (19) 3741-9902", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c406", "name": "Campysatt – Infraestrutura de TI", "phone": "+55 (19) 3271-2366 / +55 (19) 99642-0202", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c407", "name": "TBComp Informática e Serviços Ltda", "phone": "+55 (19) 3342-5071", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c408", "name": "Lead TI – Liderança em Tecnologia", "phone": "+55 (19) 3276-0779", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c409", "name": "Clubetec", "phone": "+55 (19) 99977-1000", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c410", "name": "Awees Soluções em TI/Telecom/Engenharia Elétrica", "phone": "+55 (19) 2121-2146", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c411", "name": "Tech Rede Soluções", "phone": "+55 (19) 98105-5043", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c412", "name": "Elyte System", "phone": "+55 (19) 3844-0505", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c413", "name": "RSeth Service", "phone": "+55 (19) 3396-5226 / +55 (19) 98865-4335", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c414", "name": "AVS Tecnologia", "phone": "+55 (19) 3243-9559", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c415", "name": "CRM Telecom", "phone": "+55 (19) 99939-5181", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c416", "name": "G T V Informática e Eletrônica", "phone": "+55 (15) 99134-3290", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c417", "name": "Alliati", "phone": "+55 (19) 3167-0299", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c418", "name": "Sedco Electronics, CFTV, Fibra Óptica, Redes e Telecom Ltda", "phone": "+55 (19) 99119-4660", "city": "Campinas", "dist": "~1.090 km", "state": "SP"}, {"id": "c419", "name": "Grupo NTSec – Matriz", "phone": "+55 (61) 3248-3829", "city": "Brasília", "dist": "~1.740 km", "state": "DF"}]
+</script>
+
+<script>
+(function(){
+  const DATA = JSON.parse(document.getElementById('raw-data').textContent);
+  const STAGE_LABEL = {1:'Mensagem', 2:'Interesse', 3:'Reunião', 4:'Compra'};
+  const STAGE_LETTER = {1:'M', 2:'I', 3:'R', 4:'C'};
+
+  let status = {};      // { id: stageNumber (0-4) }
+  let collapsedCities = new Set();
+  let activeFilter = 'all';
+  let searchTerm = '';
+
+  // ---------- group data by state -> city (preserving source order) ----------
+  const states = [];
+  const stateMap = {};
+  DATA.forEach(c => {
+    if(!stateMap[c.state]){
+      const stateNames = { PR:'Paraná', SP:'São Paulo', DF:'Distrito Federal' };
+      stateMap[c.state] = { name: stateNames[c.state] || c.state, cities: [], cityMap:{} };
+      states.push(stateMap[c.state]);
+    }
+    const st = stateMap[c.state];
+    if(!st.cityMap[c.city]){
+      st.cityMap[c.city] = { name:c.city, dist:c.dist, contacts:[] };
+      st.cities.push(st.cityMap[c.city]);
+    }
+    st.cityMap[c.city].contacts.push(c);
+  });
+
+  // ---------- whatsapp link helper ----------
+  function waLink(phoneRaw){
+    const first = phoneRaw.split('/')[0].replace(/\(.*?\)/g,'');
+    const digits = first.replace(/\D/g,'');
+    // valid mobile-shaped BR number: 55 + DDD(2) + 9 + 8 digits = 13 digits
+    if(digits.length === 13 && digits.startsWith('55')){
+      return 'https://wa.me/' + digits;
+    }
+    if(digits.length === 12 && digits.startsWith('55')){
+      return 'https://wa.me/' + digits; // landline still clickable via wa.me (works for whatsapp business lines too)
+    }
+    return null;
+  }
+
+  // ---------- local storage + manual export/import for cross-device sync ----------
+  const LOCAL_KEY = 'rota-integradores-status-v1';
+  let saveTimer = null;
+
+  function loadStatus(){
+    try{
+      const raw = localStorage.getItem(LOCAL_KEY);
+      status = raw ? JSON.parse(raw) : {};
+    }catch(e){ status = {}; }
+    setSyncBadge(Object.keys(status).length ? 'ok' : 'empty');
+  }
+
+  function queueSave(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(()=>{
+      try{
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(status));
+        setSyncBadge('ok');
+        showToast();
+      }catch(e){ console.error('local storage error', e); setSyncBadge('warn'); }
+    }, 300);
+  }
+
+  function setSyncBadge(state){
+    const el = document.getElementById('syncBadge');
+    if(!el) return;
+    const map = {
+      ok:    {text:'Salvo neste aparelho', cls:'ok'},
+      empty: {text:'Nenhum progresso ainda', cls:'ok'},
+      warn:  {text:'Erro ao salvar', cls:'warn'},
+    };
+    const s = map[state] || map.ok;
+    el.textContent = s.text;
+    el.className = 'sync-badge ' + s.cls;
+  }
+
+  function exportStatus(){
+    const blob = new Blob([JSON.stringify(status, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `progresso-integradores-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function importStatus(file){
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const incoming = JSON.parse(reader.result);
+        if(typeof incoming !== 'object' || incoming === null) throw new Error('formato inválido');
+        // merge: keep the higher stage for each contact when combining two devices' progress
+        Object.keys(incoming).forEach(id=>{
+          const incomingStage = incoming[id]||0;
+          const currentStage = status[id]||0;
+          status[id] = Math.max(incomingStage, currentStage);
+        });
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(status));
+        setSyncBadge('ok');
+        renderDashboard();
+        renderNav();
+        document.querySelectorAll('.contact-row').forEach(row=>syncRowVisual(row.dataset.id));
+        applyFilters();
+        showToast();
+      }catch(e){
+        alert('Não foi possível importar este arquivo. Verifique se é um export gerado por este site.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function showToast(){
+    const t = document.getElementById('saveToast');
+    t.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=>t.classList.remove('show'), 1400);
+  }
+
+  // ---------- render ----------
+  function svgMsg(){
+    return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
+  }
+
+  function renderDashboard(){
+    const total = DATA.length;
+    const counts = {1:0,2:0,3:0,4:0};
+    DATA.forEach(c=>{
+      const s = status[c.id] || 0;
+      for(let i=1;i<=s;i++) counts[i]++;
+    });
+    const tiles = [
+      {label:'Total de contatos', val: total, color:'var(--text-faint)', pct:null},
+      {label:'M · Mensagem', val: counts[1], color:'var(--s1)'},
+      {label:'I · Interesse', val: counts[2], color:'var(--s2)'},
+      {label:'R · Reunião', val: counts[3], color:'var(--s3)'},
+      {label:'C · Compra', val: counts[4], color:'var(--s4)'},
+    ];
+    const html = tiles.map(t=>{
+      const pct = t.pct === null ? null : Math.round((t.val/total)*100);
+      const pctVal = t.label==='Total de contatos' ? null : Math.round((t.val/total)*100);
+      return `<div class="tile">
+        <div class="tlabel"><span class="sw" style="background:${t.color}"></span>${t.label}</div>
+        <div class="tval">${t.val}</div>
+        ${t.label==='Total de contatos'
+          ? `<div class="tpct">100% do território</div><div class="bar"><i style="width:100%;background:var(--text-faint)"></i></div>`
+          : `<div class="tpct">${pctVal}% do total</div><div class="bar"><i style="width:${pctVal}%;background:${t.color}"></i></div>`
+        }
+      </div>`;
+    }).join('');
+    document.getElementById('dashboard').innerHTML = html;
+  }
+
+  function cityId(name){ return 'city-' + name.toLowerCase().replace(/[^a-z0-9]+/g,'-'); }
+
+  function cityProgress(cityObj){
+    const withStatus = cityObj.contacts.filter(c => (status[c.id]||0) > 0).length;
+    const allDone = cityObj.contacts.every(c => (status[c.id]||0) === 4);
+    return { withStatus, allDone, total: cityObj.contacts.length };
+  }
+
+  function matchesFilter(c){
+    const s = status[c.id] || 0;
+    if(activeFilter === 'none') return s === 0;
+    if(activeFilter === 'progress') return s >= 1 && s <= 3;
+    if(activeFilter === 'done') return s === 4;
+    return true;
+  }
+  function matchesSearch(c){
+    if(!searchTerm) return true;
+    const hay = (c.name + ' ' + c.city).toLowerCase();
+    return hay.includes(searchTerm);
+  }
+
+  function renderNav(){
+    let html = '';
+    states.forEach(st=>{
+      html += `<div class="state-heading">${st.name}</div>`;
+      st.cities.forEach(city=>{
+        const prog = cityProgress(city);
+        const dotClass = prog.allDone ? 'done' : (prog.withStatus>0 ? 'has' : '');
+        html += `<a class="nav-link" data-city="${cityId(city.name)}" href="#${cityId(city.name)}">
+          <span class="progress-dot ${dotClass}"></span>
+          <span style="flex:1">${city.name}</span>
+          <span class="nc">${prog.withStatus}/${prog.total}</span>
+        </a>`;
+      });
+    });
+    document.getElementById('cityNav').innerHTML = html;
+    document.querySelectorAll('.nav-link').forEach(a=>{
+      a.addEventListener('click', e=>{
+        e.preventDefault();
+        const el = document.getElementById(a.dataset.city);
+        if(el){
+          const stopEl = el.closest('.stop');
+          stopEl.classList.remove('collapsed');
+          collapsedCities.delete(stopEl.dataset.city);
+          el.scrollIntoView({behavior:'smooth', block:'start'});
+        }
+      });
+    });
+  }
+
+  function segButton(contact, stageNum){
+    const active = (status[contact.id]||0) >= stageNum;
+    return `<button class="seg" data-id="${contact.id}" data-stage="${stageNum}" data-active="${active?1:0}" title="${STAGE_LABEL[stageNum]}">${STAGE_LETTER[stageNum]}</button>`;
+  }
+
+  function contactRow(c){
+    const s = status[c.id]||0;
+    const link = waLink(c.phone);
+    const phoneHtml = link
+      ? `<a class="cphone wa" href="${link}" target="_blank" rel="noopener">${svgMsg()}${c.phone}</a>`
+      : `<span class="cphone">${svgMsg()}${c.phone}</span>`;
+    return `<li class="contact-row ${s===4?'done':''}" data-id="${c.id}" data-name="${c.name.toLowerCase()}" data-city="${c.city.toLowerCase()}">
+      <div class="cinfo">
+        <span class="cname"></span>
+        <div class="cphone-row">${phoneHtml}</div>
+      </div>
+      <div class="stage-track">
+        ${[1,2,3,4].map(n=>segButton(c,n)).join('')}
+        <button class="reset-btn" data-id="${c.id}" title="Limpar progresso">✕</button>
+      </div>
+    </li>`;
+  }
+
+  function renderRoute(){
+    let html = '';
+    states.forEach(st=>{
+      html += `<section class="state-block"><div class="state-title">${st.name}</div><div class="route-line">`;
+      st.cities.forEach(city=>{
+        const id = cityId(city.name);
+        html += `<div class="stop" data-city="${id}">
+          <div class="stop-marker"></div>
+          <div class="stop-head" data-toggle="${id}">
+            <h3 id="${id}">${city.name}</h3>
+            <span class="dist mono">${city.dist||''}</span>
+            <span class="count">${city.contacts.length} contato${city.contacts.length!==1?'s':''}</span>
+            <span class="chevron">▾</span>
+          </div>
+          <ul class="contact-list">
+            ${city.contacts.map(contactRow).join('')}
+          </ul>
+        </div>`;
+      });
+      html += `</div></section>`;
+    });
+    document.getElementById('route').innerHTML = html;
+
+    // set text content safely (avoid HTML injection from names)
+    document.querySelectorAll('.contact-row').forEach(row=>{
+      const id = row.dataset.id;
+      const c = DATA.find(d=>d.id===id);
+      row.querySelector('.cname').textContent = c.name;
+    });
+
+    document.querySelectorAll('.stop-head').forEach(h=>{
+      h.addEventListener('click', ()=>{
+        const stop = h.closest('.stop');
+        stop.classList.toggle('collapsed');
+        const cid = stop.dataset.city;
+        if(stop.classList.contains('collapsed')) collapsedCities.add(cid);
+        else collapsedCities.delete(cid);
+      });
+    });
+
+    document.querySelectorAll('.seg').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        const stageNum = parseInt(btn.dataset.stage,10);
+        const current = status[id] || 0;
+        // smart toggle: clicking the current top stage retracts by one; otherwise jump to that stage
+        status[id] = (current === stageNum) ? stageNum - 1 : stageNum;
+        applyUpdate(id);
+      });
+    });
+    document.querySelectorAll('.reset-btn').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        e.stopPropagation();
+        status[btn.dataset.id] = 0;
+        applyUpdate(btn.dataset.id);
+      });
+    });
+  }
+
+  function syncRowVisual(id){
+    const row = document.querySelector(`.contact-row[data-id="${id}"]`);
+    if(!row) return;
+    const s = status[id] || 0;
+    row.querySelectorAll('.seg').forEach(seg=>{
+      const stageNum = parseInt(seg.dataset.stage,10);
+      seg.dataset.active = s >= stageNum ? 1 : 0;
+    });
+    row.classList.toggle('done', s===4);
+  }
+
+  function applyUpdate(id){
+    syncRowVisual(id);
+    renderDashboard();
+    renderNav();
+    applyFilters();
+    queueSave();
+  }
+
+  function applyFilters(){
+    document.querySelectorAll('.contact-row').forEach(row=>{
+      const c = DATA.find(d=>d.id===row.dataset.id);
+      const show = matchesFilter(c) && matchesSearch(c);
+      row.classList.toggle('hidden', !show);
+    });
+    document.querySelectorAll('.stop').forEach(stop=>{
+      const visibleRows = stop.querySelectorAll('.contact-row:not(.hidden)').length;
+      stop.classList.toggle('hidden', visibleRows === 0);
+    });
+    document.querySelectorAll('.nav-link').forEach(a=>{
+      const stopEl = document.getElementById(a.dataset.city)?.closest('.stop');
+      a.classList.toggle('hidden', stopEl ? stopEl.classList.contains('hidden') : false);
+    });
+  }
+
+  // ---------- controls wiring ----------
+  document.getElementById('search').addEventListener('input', e=>{
+    searchTerm = e.target.value.trim().toLowerCase();
+    applyFilters();
+  });
+  document.getElementById('chips').addEventListener('click', e=>{
+    const chip = e.target.closest('.chip');
+    if(!chip) return;
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    activeFilter = chip.dataset.filter;
+    applyFilters();
+  });
+  document.getElementById('exportBtn').addEventListener('click', exportStatus);
+  document.getElementById('importInput').addEventListener('change', e=>{
+    const file = e.target.files[0];
+    if(file) importStatus(file);
+    e.target.value = '';
+  });
+
+  // ---------- init ----------
+  (function init(){
+    loadStatus();
+    renderDashboard();
+    renderNav();
+    renderRoute();
+    applyFilters();
+  })();
+})();
+</script>
+</body>
+</html>
