@@ -164,12 +164,11 @@
   .cname-row{display:flex; align-items:center; gap:6px;}
   .cname{font-size:14px; font-weight:600; line-height:1.35;}
   .edit-btn{
-    width:18px; height:18px; border-radius:4px; border:none; background:transparent;
-    color:var(--text-faint); cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:center;
-    opacity:0; transition:opacity .15s; flex-shrink:0;
+    width:22px; height:22px; border-radius:5px; border:1px solid var(--border-soft); background:var(--bg-alt);
+    color:var(--text-faint); cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; transition:all .15s;
   }
-  .contact-row:hover .edit-btn, .contact-row:focus-within .edit-btn{opacity:1;}
-  .edit-btn:hover{color:var(--s1);}
+  .edit-btn:hover, .edit-btn:active{color:var(--s1); border-color:var(--s1);}
   .cresp{
     display:none; font-size:11.5px; color:var(--text-faint); font-family:'IBM Plex Mono',monospace;
     margin-top:1px;
@@ -197,12 +196,11 @@
   .seg[data-active="1"][data-stage="4"]{background:var(--s4); border-color:var(--s4); color:#0d1216;}
 
   .reset-btn{
-    width:22px; height:22px; border-radius:6px; border:1px solid transparent; background:transparent;
+    width:22px; height:22px; border-radius:6px; border:1px solid var(--border-soft); background:var(--bg-alt);
     color:var(--text-faint); cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center;
-    opacity:0; transition:opacity .15s;
+    transition:all .15s;
   }
-  .contact-row:hover .reset-btn{opacity:1;}
-  .reset-btn:hover{color:var(--danger); border-color:var(--danger);}
+  .reset-btn:hover, .reset-btn:active{color:var(--danger); border-color:var(--danger);}
 
   .legend{
     display:flex; gap:16px; flex-wrap:wrap; font-family:'IBM Plex Mono',monospace; font-size:11px;
