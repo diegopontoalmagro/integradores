@@ -161,7 +161,19 @@
   .contact-row.done{background:linear-gradient(90deg, var(--s4-soft), var(--surface) 40%);}
 
   .cinfo{min-width:0; flex:1;}
-  .cname{font-size:14px; font-weight:600; display:block; line-height:1.35;}
+  .cname-row{display:flex; align-items:center; gap:6px;}
+  .cname{font-size:14px; font-weight:600; line-height:1.35;}
+  .edit-btn{
+    width:18px; height:18px; border-radius:4px; border:none; background:transparent;
+    color:var(--text-faint); cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:center;
+    opacity:0; transition:opacity .15s; flex-shrink:0;
+  }
+  .contact-row:hover .edit-btn, .contact-row:focus-within .edit-btn{opacity:1;}
+  .edit-btn:hover{color:var(--s1);}
+  .cresp{
+    display:none; font-size:11.5px; color:var(--text-faint); font-family:'IBM Plex Mono',monospace;
+    margin-top:1px;
+  }
   .cphone-row{display:flex; align-items:center; gap:6px; margin-top:3px;}
   .cphone{
     font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-muted); text-decoration:none;
@@ -363,6 +375,22 @@
   </div>
 </div>
 
+<div id="editModal" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <h3>Editar contato</h3>
+    <p class="auth-hint" id="editOriginalName"></p>
+    <label class="auth-label" for="editEmpresa">Empresa</label>
+    <input id="editEmpresa" class="auth-input" type="text">
+    <label class="auth-label" for="editResponsavel">Responsável</label>
+    <input id="editResponsavel" class="auth-input" type="text" placeholder="opcional">
+    <div class="modal-actions">
+      <button id="editSaveBtn" class="auth-submit" style="margin-top:0;">Salvar</button>
+      <div class="chip" id="editResetBtn">Restaurar original</div>
+      <div class="chip" id="editCloseBtn">Cancelar</div>
+    </div>
+  </div>
+</div>
+
 <div id="app" class="locked">
 
   <header class="topbar">
@@ -425,9 +453,23 @@
   const STAGE_LETTER = {1:'M', 2:'I', 3:'R', 4:'C'};
 
   let status = {};      // { id: stageNumber (0-4) }
+  let edits = {};        // { id: {empresa, responsavel} } -- overrides display name
   let collapsedCities = new Set();
   let activeFilter = 'all';
   let searchTerm = '';
+
+  const DATA_BY_ID = new Map(DATA.map(d=>[d.id, d]));
+
+  function getDisplayName(id){
+    const e = edits[id];
+    if(e && e.empresa) return e.empresa;
+    const c = DATA_BY_ID.get(id);
+    return c ? c.name : '';
+  }
+  function getResponsavel(id){
+    const e = edits[id];
+    return (e && e.responsavel) ? e.responsavel : '';
+  }
 
   // ---------- group data by state -> city (preserving source order) ----------
   const states = [];
@@ -462,6 +504,7 @@
 
   // ---------- local storage + optional GitHub Gist sync (user-supplied credentials) ----------
   const LOCAL_KEY = 'rota-integradores-status-v1';
+  const EDITS_KEY = 'rota-integradores-edits-v1';
   const GIST_ID_KEY = 'ri-gist-id';
   const GIST_TOKEN_KEY = 'ri-gist-token';
   const GIST_FILE = 'contact-status.json';
@@ -480,11 +523,18 @@
       const raw = localStorage.getItem(LOCAL_KEY);
       status = raw ? JSON.parse(raw) : {};
     }catch(e){ status = {}; }
+    try{
+      const rawEdits = localStorage.getItem(EDITS_KEY);
+      edits = rawEdits ? JSON.parse(rawEdits) : {};
+    }catch(e){ edits = {}; }
     setSyncBadge(gistCreds() ? 'local-gist' : (Object.keys(status).length ? 'local' : 'empty'));
   }
 
   function queueSave(){
-    try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(status)); }catch(e){}
+    try{
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(status));
+      localStorage.setItem(EDITS_KEY, JSON.stringify(edits));
+    }catch(e){}
     clearTimeout(saveTimer);
     const creds = gistCreds();
     if(!creds){ setSyncBadge('local'); showToast(); return; }
@@ -503,12 +553,18 @@
       if(!res.ok) throw new Error('gist fetch ' + res.status);
       const data = await res.json();
       const content = data.files && data.files[GIST_FILE] && data.files[GIST_FILE].content;
-      const remote = content ? JSON.parse(content) : {};
-      // merge: keep the more advanced stage for each contact
-      Object.keys(remote).forEach(id=>{
-        status[id] = Math.max(remote[id]||0, status[id]||0);
+      const parsed = content ? JSON.parse(content) : {};
+      // backward compatible: old gists stored a flat {id: stage} map with no "status"/"edits" keys
+      const remoteStatus = (parsed && (parsed.status || parsed.edits)) ? (parsed.status || {}) : parsed;
+      const remoteEdits = (parsed && parsed.edits) ? parsed.edits : {};
+      // merge status: keep the more advanced stage for each contact
+      Object.keys(remoteStatus).forEach(id=>{
+        status[id] = Math.max(remoteStatus[id]||0, status[id]||0);
       });
+      // merge edits: local edits win on conflict, remote fills gaps
+      edits = Object.assign({}, remoteEdits, edits);
       localStorage.setItem(LOCAL_KEY, JSON.stringify(status));
+      localStorage.setItem(EDITS_KEY, JSON.stringify(edits));
       setSyncBadge('synced');
       return true;
     }catch(e){
@@ -530,7 +586,7 @@
           'Accept':'application/vnd.github+json',
           'Content-Type':'application/json'
         },
-        body: JSON.stringify({ files:{ [GIST_FILE]: { content: JSON.stringify(status) } } })
+        body: JSON.stringify({ files:{ [GIST_FILE]: { content: JSON.stringify({status, edits}) } } })
       });
       if(!res.ok) throw new Error('gist patch ' + res.status);
       setSyncBadge('synced');
@@ -563,7 +619,7 @@
   }
 
   function exportStatus(){
-    const blob = new Blob([JSON.stringify(status, null, 2)], {type:'application/json'});
+    const blob = new Blob([JSON.stringify({status, edits}, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const stamp = new Date().toISOString().slice(0,10);
@@ -579,19 +635,24 @@
     const reader = new FileReader();
     reader.onload = () => {
       try{
-        const incoming = JSON.parse(reader.result);
-        if(typeof incoming !== 'object' || incoming === null) throw new Error('formato inválido');
+        const parsed = JSON.parse(reader.result);
+        if(typeof parsed !== 'object' || parsed === null) throw new Error('formato inválido');
+        // backward compatible: old exports were a flat {id: stage} map
+        const incomingStatus = (parsed.status || parsed.edits) ? (parsed.status || {}) : parsed;
+        const incomingEdits = parsed.edits || {};
         // merge: keep the higher stage for each contact when combining two devices' progress
-        Object.keys(incoming).forEach(id=>{
-          const incomingStage = incoming[id]||0;
-          const currentStage = status[id]||0;
-          status[id] = Math.max(incomingStage, currentStage);
+        Object.keys(incomingStatus).forEach(id=>{
+          status[id] = Math.max(incomingStatus[id]||0, status[id]||0);
         });
+        // merge edits: local wins on conflict, incoming fills gaps
+        edits = Object.assign({}, incomingEdits, edits);
         localStorage.setItem(LOCAL_KEY, JSON.stringify(status));
-        setSyncBadge('ok');
+        localStorage.setItem(EDITS_KEY, JSON.stringify(edits));
+        setSyncBadge('local');
         renderDashboard();
         renderNav();
-        document.querySelectorAll('.contact-row').forEach(row=>syncRowVisual(row.dataset.id));
+        document.querySelectorAll('.contact-row').forEach(row=>refreshRowContent(row.dataset.id));
+        resortAllCities();
         applyFilters();
         showToast();
       }catch(e){
@@ -659,7 +720,7 @@
   }
   function matchesSearch(c){
     if(!searchTerm) return true;
-    const hay = (c.name + ' ' + c.city).toLowerCase();
+    const hay = (getDisplayName(c.id) + ' ' + getResponsavel(c.id) + ' ' + c.city).toLowerCase();
     return hay.includes(searchTerm);
   }
 
@@ -703,9 +764,13 @@
     const phoneHtml = link
       ? `<a class="cphone wa" href="${link}" target="_blank" rel="noopener">${svgMsg()}${c.phone}</a>`
       : `<span class="cphone">${svgMsg()}${c.phone}</span>`;
-    return `<li class="contact-row ${s===4?'done':''}" data-id="${c.id}" data-name="${c.name.toLowerCase()}" data-city="${c.city.toLowerCase()}">
+    return `<li class="contact-row ${s===4?'done':''}" data-id="${c.id}">
       <div class="cinfo">
-        <span class="cname"></span>
+        <div class="cname-row">
+          <span class="cname"></span>
+          <button class="edit-btn" data-id="${c.id}" title="Editar empresa / responsável">✎</button>
+        </div>
+        <span class="cresp"></span>
         <div class="cphone-row">${phoneHtml}</div>
       </div>
       <div class="stage-track">
@@ -713,6 +778,42 @@
         <button class="reset-btn" data-id="${c.id}" title="Limpar progresso">✕</button>
       </div>
     </li>`;
+  }
+
+  function sortedContacts(arr){
+    return arr.slice().sort((a,b)=>{
+      const sa = status[a.id]||0, sb = status[b.id]||0;
+      if(sb !== sa) return sb - sa; // higher stage first
+      return getDisplayName(a.id).localeCompare(getDisplayName(b.id), 'pt-BR', {sensitivity:'base'});
+    });
+  }
+
+  function resortAllCities(){
+    document.querySelectorAll('.stop').forEach(stop=>{
+      const ul = stop.querySelector('.contact-list');
+      if(!ul) return;
+      const rows = Array.from(ul.children);
+      const first = new Map(rows.map(r=>[r, r.getBoundingClientRect()]));
+      rows.sort((a,b)=>{
+        const sa = status[a.dataset.id]||0, sb = status[b.dataset.id]||0;
+        if(sb !== sa) return sb - sa;
+        return getDisplayName(a.dataset.id).localeCompare(getDisplayName(b.dataset.id), 'pt-BR', {sensitivity:'base'});
+      });
+      rows.forEach(r=>ul.appendChild(r));
+      rows.forEach(r=>{
+        const f = first.get(r);
+        const l = r.getBoundingClientRect();
+        const dy = f.top - l.top;
+        if(dy){
+          r.style.transition = 'none';
+          r.style.transform = `translateY(${dy}px)`;
+          requestAnimationFrame(()=>{
+            r.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1)';
+            r.style.transform = '';
+          });
+        }
+      });
+    });
   }
 
   function renderRoute(){
@@ -730,7 +831,7 @@
             <span class="chevron">▾</span>
           </div>
           <ul class="contact-list">
-            ${city.contacts.map(contactRow).join('')}
+            ${sortedContacts(city.contacts).map(contactRow).join('')}
           </ul>
         </div>`;
       });
@@ -741,8 +842,18 @@
     // set text content safely (avoid HTML injection from names)
     document.querySelectorAll('.contact-row').forEach(row=>{
       const id = row.dataset.id;
-      const c = DATA.find(d=>d.id===id);
-      row.querySelector('.cname').textContent = c.name;
+      row.querySelector('.cname').textContent = getDisplayName(id);
+      const resp = getResponsavel(id);
+      const respEl = row.querySelector('.cresp');
+      respEl.textContent = resp ? `Responsável: ${resp}` : '';
+      respEl.style.display = resp ? 'block' : 'none';
+    });
+
+    document.querySelectorAll('.edit-btn').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        e.stopPropagation();
+        openEditModal(btn.dataset.id);
+      });
     });
 
     document.querySelectorAll('.stop-head').forEach(h=>{
@@ -790,13 +901,14 @@
     syncRowVisual(id);
     renderDashboard();
     renderNav();
+    resortAllCities();
     applyFilters();
     queueSave();
   }
 
   function applyFilters(){
     document.querySelectorAll('.contact-row').forEach(row=>{
-      const c = DATA.find(d=>d.id===row.dataset.id);
+      const c = DATA_BY_ID.get(row.dataset.id);
       const show = matchesFilter(c) && matchesSearch(c);
       row.classList.toggle('hidden', !show);
     });
@@ -841,6 +953,17 @@
     startApp();
   }
 
+  function refreshRowContent(id){
+    syncRowVisual(id);
+    const row = document.querySelector(`.contact-row[data-id="${id}"]`);
+    if(!row) return;
+    row.querySelector('.cname').textContent = getDisplayName(id);
+    const resp = getResponsavel(id);
+    const respEl = row.querySelector('.cresp');
+    respEl.textContent = resp ? `Responsável: ${resp}` : '';
+    respEl.style.display = resp ? 'block' : 'none';
+  }
+
   function startApp(){
     loadStatus();
     renderDashboard();
@@ -852,7 +975,8 @@
         if(ok){
           renderDashboard();
           renderNav();
-          document.querySelectorAll('.contact-row').forEach(row=>syncRowVisual(row.dataset.id));
+          document.querySelectorAll('.contact-row').forEach(row=>refreshRowContent(row.dataset.id));
+          resortAllCities();
           applyFilters();
         }
       });
@@ -903,7 +1027,8 @@
       pullFromGist().then(ok=>{
         renderDashboard();
         renderNav();
-        document.querySelectorAll('.contact-row').forEach(row=>syncRowVisual(row.dataset.id));
+        document.querySelectorAll('.contact-row').forEach(row=>refreshRowContent(row.dataset.id));
+        resortAllCities();
         applyFilters();
         if(!ok) alert('Não consegui conectar a esse Gist. Confira o ID e o token e tente de novo.');
       });
@@ -921,6 +1046,57 @@
     localStorage.removeItem(AUTH_KEY);
     closeSyncModal();
     location.reload();
+  });
+
+  // ---------- edit contact (empresa / responsável) ----------
+  let editingId = null;
+
+  function openEditModal(id){
+    editingId = id;
+    const c = DATA_BY_ID.get(id);
+    document.getElementById('editOriginalName').textContent = `Nome original: ${c.name}`;
+    document.getElementById('editEmpresa').value = getDisplayName(id);
+    document.getElementById('editResponsavel').value = getResponsavel(id);
+    document.getElementById('editModal').style.display = 'flex';
+    document.getElementById('editEmpresa').focus();
+  }
+  function closeEditModal(){
+    document.getElementById('editModal').style.display = 'none';
+    editingId = null;
+  }
+  function saveEdit(){
+    if(!editingId) return;
+    const c = DATA_BY_ID.get(editingId);
+    const empresa = document.getElementById('editEmpresa').value.trim();
+    const responsavel = document.getElementById('editResponsavel').value.trim();
+    if(!empresa || (empresa === c.name && !responsavel)){
+      delete edits[editingId]; // back to original, nothing to store
+    }else{
+      edits[editingId] = { empresa: empresa || c.name, responsavel };
+    }
+    const id = editingId;
+    closeEditModal();
+    const row = document.querySelector(`.contact-row[data-id="${id}"]`);
+    if(row){
+      row.querySelector('.cname').textContent = getDisplayName(id);
+      const resp = getResponsavel(id);
+      const respEl = row.querySelector('.cresp');
+      respEl.textContent = resp ? `Responsável: ${resp}` : '';
+      respEl.style.display = resp ? 'block' : 'none';
+    }
+    resortAllCities();
+    queueSave();
+  }
+  document.getElementById('editSaveBtn').addEventListener('click', saveEdit);
+  document.getElementById('editCloseBtn').addEventListener('click', closeEditModal);
+  document.getElementById('editResetBtn').addEventListener('click', ()=>{
+    if(!editingId) return;
+    const c = DATA_BY_ID.get(editingId);
+    document.getElementById('editEmpresa').value = c.name;
+    document.getElementById('editResponsavel').value = '';
+  });
+  document.getElementById('editModal').addEventListener('click', e=>{
+    if(e.target.id === 'editModal') closeEditModal();
   });
 
   // ---------- init ----------
