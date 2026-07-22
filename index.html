@@ -443,16 +443,28 @@
     <label class="auth-label" for="addPhone">Telefone / WhatsApp</label>
     <input id="addPhone" class="auth-input" type="tel" placeholder="(45) 99999-9999">
 
+    <label class="auth-label" for="addCountrySelect">País</label>
+    <select id="addCountrySelect" class="auth-input">
+      <option value="BR">Brasil</option>
+      <option value="AR">Argentina</option>
+      <option value="PY">Paraguai</option>
+    </select>
+
+    <div id="brStateWrap">
+      <label class="auth-label" for="addStateSelect">Estado</label>
+      <select id="addStateSelect" class="auth-input"></select>
+      <div id="newStateFields" style="display:none;">
+        <label class="auth-label" for="addNewStateName">Nome do novo estado</label>
+        <input id="addNewStateName" class="auth-input" type="text" placeholder="ex: Santa Catarina">
+        <label class="auth-label" for="addNewStateCode">Sigla (2 letras)</label>
+        <input id="addNewStateCode" class="auth-input" type="text" maxlength="2" placeholder="ex: SC">
+      </div>
+    </div>
+
     <label class="auth-label" for="addCitySelect">Cidade</label>
     <select id="addCitySelect" class="auth-input"></select>
 
     <div id="newCityFields" style="display:none;">
-      <label class="auth-label" for="addNewState">Estado</label>
-      <select id="addNewState" class="auth-input">
-        <option value="PR">Paraná</option>
-        <option value="SP">São Paulo</option>
-        <option value="DF">Distrito Federal</option>
-      </select>
       <label class="auth-label" for="addNewCityName">Nome da nova cidade</label>
       <input id="addNewCityName" class="auth-input" type="text" placeholder="ex: Umuarama">
       <label class="auth-label" for="addNewCityDist">Distância aproximada de Foz (opcional)</label>
@@ -568,12 +580,13 @@
   }
 
   // ---------- group data by state -> city (preserving source order) ----------
-  const STATE_NAMES = { PR:'Paraná', SP:'São Paulo', DF:'Distrito Federal' };
+  const STATE_NAMES = { PR:'Paraná', SP:'São Paulo', DF:'Distrito Federal', AR:'Argentina', PY:'Paraguai' };
+  const COUNTRY_NAMES = { BR:'Brasil', AR:'Argentina', PY:'Paraguai' };
   const states = [];
   const stateMap = {};
   DATA.forEach(c => {
     if(!stateMap[c.state]){
-      stateMap[c.state] = { key:c.state, name: STATE_NAMES[c.state] || c.state, cities: [], cityMap:{} };
+      stateMap[c.state] = { key:c.state, name: STATE_NAMES[c.state] || c.state, country: c.country || 'BR', cities: [], cityMap:{} };
       states.push(stateMap[c.state]);
     }
     const st = stateMap[c.state];
@@ -587,7 +600,7 @@
   function insertContactIntoStates(c){
     DATA_BY_ID.set(c.id, c);
     if(!stateMap[c.state]){
-      stateMap[c.state] = { key:c.state, name: STATE_NAMES[c.state] || c.state, cities: [], cityMap:{} };
+      stateMap[c.state] = { key:c.state, name: c.stateName || STATE_NAMES[c.state] || c.state, country: c.country || 'BR', cities: [], cityMap:{} };
       states.push(stateMap[c.state]);
     }
     const st = stateMap[c.state];
@@ -1366,24 +1379,60 @@
   });
 
   // ---------- add new contact ----------
-  function populateCitySelect(){
+  function populateCitySelectFor(stateKey){
     const sel = document.getElementById('addCitySelect');
     sel.innerHTML = '';
-    states.forEach(st=>{
-      const group = document.createElement('optgroup');
-      group.label = st.name;
+    const st = stateMap[stateKey];
+    if(st){
       st.cities.forEach(city=>{
         const opt = document.createElement('option');
-        opt.value = JSON.stringify({stateKey: st.key, cityName: city.name});
+        opt.value = JSON.stringify({stateKey, cityName: city.name});
         opt.textContent = `${city.name}${city.dist ? ' ('+city.dist+')' : ''}`;
-        group.appendChild(opt);
+        sel.appendChild(opt);
       });
-      sel.appendChild(group);
-    });
+    }
     const newOpt = document.createElement('option');
     newOpt.value = '__new__';
     newOpt.textContent = '+ Nova cidade…';
     sel.appendChild(newOpt);
+    const hasCities = st && st.cities.length > 0;
+    if(!hasCities) sel.value = '__new__';
+    document.getElementById('newCityFields').style.display = (sel.value === '__new__') ? 'block' : 'none';
+  }
+
+  function populateStateSelect(){
+    const sel = document.getElementById('addStateSelect');
+    sel.innerHTML = '';
+    states.filter(st=>st.country === 'BR').forEach(st=>{
+      const opt = document.createElement('option');
+      opt.value = st.key;
+      opt.textContent = st.name;
+      sel.appendChild(opt);
+    });
+    const newOpt = document.createElement('option');
+    newOpt.value = '__newstate__';
+    newOpt.textContent = '+ Novo estado…';
+    sel.appendChild(newOpt);
+  }
+
+  function onCountryChange(){
+    const country = document.getElementById('addCountrySelect').value;
+    const brWrap = document.getElementById('brStateWrap');
+    if(country === 'BR'){
+      brWrap.style.display = 'block';
+      populateStateSelect();
+      document.getElementById('newStateFields').style.display = 'none';
+      populateCitySelectFor(document.getElementById('addStateSelect').value);
+    }else{
+      brWrap.style.display = 'none';
+      // Argentina/Paraguai: no state layer, country code itself is the grouping key
+      if(!stateMap[country]){
+        // lazily create the empty pseudo-state bucket so the dropdown shows "+ Nova cidade" cleanly
+        stateMap[country] = { key:country, name: COUNTRY_NAMES[country], country, cities: [], cityMap:{} };
+        states.push(stateMap[country]);
+      }
+      populateCitySelectFor(country);
+    }
   }
 
   function openAddModal(){
@@ -1392,9 +1441,11 @@
     document.getElementById('addPhone').value = '';
     document.getElementById('addNewCityName').value = '';
     document.getElementById('addNewCityDist').value = '';
+    document.getElementById('addNewStateName').value = '';
+    document.getElementById('addNewStateCode').value = '';
     document.getElementById('addError').style.display = 'none';
-    document.getElementById('newCityFields').style.display = 'none';
-    populateCitySelect();
+    document.getElementById('addCountrySelect').value = 'BR';
+    onCountryChange();
     document.getElementById('addModal').style.display = 'flex';
     document.getElementById('addEmpresa').focus();
   }
@@ -1406,6 +1457,20 @@
   document.getElementById('addModal').addEventListener('click', e=>{
     if(e.target.id === 'addModal') closeAddModal();
   });
+  document.getElementById('addCountrySelect').addEventListener('change', onCountryChange);
+  document.getElementById('addStateSelect').addEventListener('change', e=>{
+    const isNew = e.target.value === '__newstate__';
+    document.getElementById('newStateFields').style.display = isNew ? 'block' : 'none';
+    if(!isNew) populateCitySelectFor(e.target.value);
+    else{
+      document.getElementById('addCitySelect').innerHTML = '';
+      const newOpt = document.createElement('option');
+      newOpt.value = '__new__';
+      newOpt.textContent = '+ Nova cidade…';
+      document.getElementById('addCitySelect').appendChild(newOpt);
+      document.getElementById('newCityFields').style.display = 'block';
+    }
+  });
   document.getElementById('addCitySelect').addEventListener('change', e=>{
     document.getElementById('newCityFields').style.display = (e.target.value === '__new__') ? 'block' : 'none';
   });
@@ -1414,28 +1479,48 @@
     const empresa = document.getElementById('addEmpresa').value.trim();
     const responsavel = document.getElementById('addResponsavel').value.trim();
     const phoneRaw = document.getElementById('addPhone').value.trim();
+    const country = document.getElementById('addCountrySelect').value;
     const citySelVal = document.getElementById('addCitySelect').value;
 
-    let stateKey, cityName, distLabel;
+    let stateKey, stateName, cityName, distLabel;
+
+    if(country === 'BR'){
+      const stateSelVal = document.getElementById('addStateSelect').value;
+      if(stateSelVal === '__newstate__'){
+        stateName = document.getElementById('addNewStateName').value.trim();
+        stateKey = document.getElementById('addNewStateCode').value.trim().toUpperCase();
+        if(!stateName || stateKey.length !== 2){
+          document.getElementById('addError').textContent = 'Preencha o nome do novo estado e a sigla (2 letras).';
+          document.getElementById('addError').style.display = 'block';
+          return;
+        }
+      }else{
+        stateKey = stateSelVal;
+        stateName = stateMap[stateKey] ? stateMap[stateKey].name : stateKey;
+      }
+    }else{
+      stateKey = country; // Argentina/Paraguai use the country code as the grouping key, no state layer
+      stateName = COUNTRY_NAMES[country];
+    }
+
     if(citySelVal === '__new__'){
-      stateKey = document.getElementById('addNewState').value;
       cityName = document.getElementById('addNewCityName').value.trim();
       distLabel = document.getElementById('addNewCityDist').value.trim();
     }else if(citySelVal){
       const parsed = JSON.parse(citySelVal);
-      stateKey = parsed.stateKey;
       cityName = parsed.cityName;
       distLabel = (stateMap[stateKey] && stateMap[stateKey].cityMap[cityName]) ? stateMap[stateKey].cityMap[cityName].dist : '';
     }
 
     if(!empresa || !phoneRaw || !cityName){
+      document.getElementById('addError').textContent = 'Preencha empresa, telefone e cidade.';
       document.getElementById('addError').style.display = 'block';
       return;
     }
     document.getElementById('addError').style.display = 'none';
 
     const id = 'custom-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7);
-    const contact = { id, name: empresa, phone: normalizePhone(phoneRaw), city: cityName, dist: distLabel, state: stateKey };
+    const contact = { id, name: empresa, phone: normalizePhone(phoneRaw), city: cityName, dist: distLabel, state: stateKey, stateName, country };
     customContacts[id] = contact;
     if(responsavel) edits[id] = { responsavel };
     insertContactIntoStates(contact);
