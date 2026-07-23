@@ -101,21 +101,25 @@
   .city-nav::-webkit-scrollbar{width:4px;}
   .city-nav::-webkit-scrollbar-thumb{background:var(--border); border-radius:4px;}
   .state-heading{
-    font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.12em; color:var(--text-faint);
-    text-transform:uppercase; margin:14px 0 6px; padding-left:10px;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em; color:var(--text-muted);
+    text-transform:uppercase; margin:10px 0 2px; padding:8px 10px; display:flex; align-items:center; gap:7px;
+    border-radius:7px; user-select:none;
   }
   .state-heading:first-child{margin-top:0;}
+  .state-heading.clickable{cursor:pointer;}
+  .state-heading.clickable:hover{background:var(--surface); color:var(--text);}
+  .sh-chevron{color:var(--text-faint); font-size:10px; width:10px; flex-shrink:0;}
   .nav-link{
     display:flex; justify-content:space-between; align-items:center; gap:8px;
-    padding:7px 10px; border-radius:7px; font-size:13px; color:var(--text-muted);
+    padding:7px 10px 7px 27px; border-radius:7px; font-size:13px; color:var(--text-muted);
     cursor:pointer; text-decoration:none; border:1px solid transparent;
   }
   .nav-link:hover{background:var(--surface); color:var(--text);}
-  .nav-link.hidden{display:none;}
+  .nav-link.hidden, .nav-link.nav-collapsed{display:none;}
   .nav-link .nc{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--text-faint);}
-  .nav-link .progress-dot{width:6px;height:6px;border-radius:50%; background:var(--border); flex-shrink:0;}
-  .nav-link .progress-dot.has{background:var(--s1);}
-  .nav-link .progress-dot.done{background:var(--s4);}
+  .progress-dot{width:6px;height:6px;border-radius:50%; background:var(--border); flex-shrink:0;}
+  .progress-dot.has{background:var(--s1);}
+  .progress-dot.done{background:var(--s4);}
 
   main.route{min-width:0;}
   .state-block{margin-bottom:6px;}
@@ -320,7 +324,8 @@
       gap:6px;
     }
     .state-heading{display:none;}
-    .nav-link{flex-shrink:0; border:1px solid var(--border);}
+    .nav-link.nav-collapsed{display:flex;}
+    .nav-link{flex-shrink:0; border:1px solid var(--border); padding:7px 10px;}
     .dashboard{grid-template-columns:repeat(3,1fr);}
   }
   @media (max-width:600px){
@@ -550,6 +555,7 @@
   let deletedIds = new Set(); // ids permanently removed from the list
   let customContacts = {}; // { id: {id,name,phone,city,dist,state} } -- manually added integrators
   let collapsedCities = new Set();
+  let navExpanded = new Set(); // state/country keys currently expanded in the sidebar; empty = all collapsed
   let activeFilter = 'all';
   let searchTerm = '';
 
@@ -970,18 +976,36 @@
   function renderNav(){
     let html = '';
     states.forEach(st=>{
-      html += `<div class="state-heading">${st.name}</div>`;
+      const expanded = navExpanded.has(st.key);
+      const totalContacts = st.cities.reduce((sum,c)=>sum+c.contacts.length, 0);
+      const anyProgress = st.cities.some(c=>cityProgress(c).withStatus > 0);
+      const allDone = st.cities.length > 0 && st.cities.every(c=>cityProgress(c).allDone);
+      const dotClass = allDone ? 'done' : (anyProgress ? 'has' : '');
+      html += `<div class="state-heading clickable" data-state-toggle="${st.key}">
+        <span class="sh-chevron">${expanded?'▾':'▸'}</span>
+        <span class="progress-dot ${dotClass}"></span>
+        <span style="flex:1">${st.name}</span>
+        <span class="nc">${totalContacts}</span>
+      </div>`;
       st.cities.forEach(city=>{
         const prog = cityProgress(city);
-        const dotClass = prog.allDone ? 'done' : (prog.withStatus>0 ? 'has' : '');
-        html += `<a class="nav-link" data-city="${cityId(city.name)}" href="#${cityId(city.name)}">
-          <span class="progress-dot ${dotClass}"></span>
+        const dotClass2 = prog.allDone ? 'done' : (prog.withStatus>0 ? 'has' : '');
+        html += `<a class="nav-link ${expanded?'':'nav-collapsed'}" data-state="${st.key}" data-city="${cityId(city.name)}" href="#${cityId(city.name)}">
+          <span class="progress-dot ${dotClass2}"></span>
           <span style="flex:1">${city.name}</span>
           <span class="nc">${prog.withStatus}/${prog.total}</span>
         </a>`;
       });
     });
     document.getElementById('cityNav').innerHTML = html;
+    document.querySelectorAll('.state-heading').forEach(h=>{
+      h.addEventListener('click', ()=>{
+        const key = h.dataset.stateToggle;
+        if(navExpanded.has(key)) navExpanded.delete(key);
+        else navExpanded.add(key);
+        renderNav();
+      });
+    });
     document.querySelectorAll('.nav-link').forEach(a=>{
       a.addEventListener('click', e=>{
         e.preventDefault();
