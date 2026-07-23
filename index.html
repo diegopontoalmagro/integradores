@@ -557,11 +557,57 @@
 
   const DATA_BY_ID = new Map(DATA.map(d=>[d.id, d]));
 
-  function normalizePhone(raw){
-    let v = raw.trim();
-    const digits = v.replace(/\D/g,'');
-    if(digits.startsWith('55')) return v.startsWith('+') ? v : `+${v}`;
-    return `+55 ${v}`;
+  function normalizePhoneByCountry(raw, country){
+    let digits = (raw || '').replace(/\D/g,'');
+
+    if(country === 'BR'){
+      if(digits.startsWith('55')) digits = digits.slice(2);
+      // toll-free / special service prefixes (0800, 0300, 0900) -> not DDD-based, keep as national grouping
+      let check = digits.startsWith('0') ? digits.slice(1) : digits;
+      if(['800','300','900'].includes(check.slice(0,3))){
+        return check.length === 10
+          ? `+55 ${check.slice(0,3)} ${check.slice(3,6)} ${check.slice(6,10)}`
+          : `+55 ${check}`;
+      }
+      if(digits.startsWith('0')) digits = digits.slice(1);
+      const ddd = digits.slice(0,2);
+      const rest = digits.slice(2);
+      let local;
+      if(rest.length === 9) local = rest.slice(0,5) + '-' + rest.slice(5);
+      else if(rest.length === 8) local = rest.slice(0,4) + '-' + rest.slice(4);
+      else local = rest; // unexpected length: leave grouped as-is rather than guess
+      return `+55 (${ddd}) ${local}`;
+    }
+
+    if(country === 'PY'){
+      if(digits.startsWith('595')) digits = digits.slice(3);
+      if(digits.startsWith('0')) digits = digits.slice(1);
+      const area = digits.slice(0,3);
+      const rest = digits.slice(3);
+      return `+595 ${area} ${rest}`;
+    }
+
+    if(country === 'AR'){
+      if(digits.startsWith('549')) digits = digits.slice(3);
+      else if(digits.startsWith('54')) digits = digits.slice(2);
+      if(digits.startsWith('9')) digits = digits.slice(1);
+      if(digits.startsWith('0')) digits = digits.slice(1);
+      let body;
+      if(digits.length === 10){
+        body = `${digits.slice(0,4)} ${digits.slice(4,6)}-${digits.slice(6,10)}`;
+      }else if(digits.length > 6){
+        const area = digits.slice(0, digits.length-6);
+        const tail = digits.slice(digits.length-6);
+        body = `${area} ${tail.slice(0,2)}-${tail.slice(2)}`;
+      }else{
+        body = digits;
+      }
+      return `+54 9 ${body}`;
+    }
+
+    // fallback for anything else
+    if(digits.startsWith('55')) return raw.trim().startsWith('+') ? raw.trim() : `+${digits}`;
+    return `+${digits}`;
   }
 
   function getDisplayName(id){
@@ -615,12 +661,10 @@
   function waLink(phoneRaw){
     const first = phoneRaw.split('/')[0];
     const digits = first.replace(/\D/g,'');
-    // valid mobile-shaped BR number: 55 + DDD(2) + 9 + 8 digits = 13 digits
-    if(digits.length === 13 && digits.startsWith('55')){
+    if(digits.length < 10 || digits.length > 15) return null;
+    // Brasil (55), Argentina (54) ou Paraguai (595)
+    if(digits.startsWith('55') || digits.startsWith('54') || digits.startsWith('595')){
       return 'https://wa.me/' + digits;
-    }
-    if(digits.length === 12 && digits.startsWith('55')){
-      return 'https://wa.me/' + digits; // landline still clickable via wa.me (works for whatsapp business lines too)
     }
     return null;
   }
@@ -1520,7 +1564,7 @@
     document.getElementById('addError').style.display = 'none';
 
     const id = 'custom-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7);
-    const contact = { id, name: empresa, phone: normalizePhone(phoneRaw), city: cityName, dist: distLabel, state: stateKey, stateName, country };
+    const contact = { id, name: empresa, phone: normalizePhoneByCountry(phoneRaw, country), city: cityName, dist: distLabel, state: stateKey, stateName, country };
     customContacts[id] = contact;
     if(responsavel) edits[id] = { responsavel };
     insertContactIntoStates(contact);
