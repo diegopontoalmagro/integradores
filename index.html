@@ -411,6 +411,8 @@
     <input id="editEmpresa" class="auth-input" type="text">
     <label class="auth-label" for="editResponsavel">Responsável</label>
     <input id="editResponsavel" class="auth-input" type="text" placeholder="opcional">
+    <label class="auth-label" for="editPhone">Telefone / WhatsApp</label>
+    <input id="editPhone" class="auth-input" type="tel">
     <div class="modal-actions">
       <button id="editSaveBtn" class="auth-submit" style="margin-top:0;">Salvar</button>
       <div class="chip" id="editResetBtn">Restaurar original</div>
@@ -625,6 +627,19 @@
   function getResponsavel(id){
     const e = edits[id];
     return (e && e.responsavel) ? e.responsavel : '';
+  }
+  function getDisplayPhone(id){
+    const e = edits[id];
+    if(e && e.phone) return e.phone;
+    const c = DATA_BY_ID.get(id);
+    return c ? c.phone : '';
+  }
+  function getContactCountry(id){
+    const c = DATA_BY_ID.get(id);
+    if(!c) return 'BR';
+    if(c.country) return c.country;
+    const st = stateMap[c.state];
+    return st ? st.country : 'BR';
   }
   function effectiveSortStage(id){
     if(notInterested[id]) return -1; // sinks below "sem contato"
@@ -1026,22 +1041,26 @@
     return `<button class="seg" data-id="${contact.id}" data-stage="${stageNum}" data-active="${active?1:0}" ${blocked?'disabled':''} title="${blocked ? 'Bloqueado: marcado como não interessado' : STAGE_LABEL[stageNum]}">${STAGE_LETTER[stageNum]}</button>`;
   }
 
+  function buildPhoneHtml(id){
+    const phone = getDisplayPhone(id);
+    const link = waLink(phone);
+    return link
+      ? `<a class="cphone wa" href="${link}" target="_blank" rel="noopener">${svgMsg()}${phone}</a>`
+      : `<span class="cphone">${svgMsg()}${phone}</span>`;
+  }
+
   function contactRow(c){
     const s = status[c.id]||0;
     const ni = !!notInterested[c.id];
-    const link = waLink(c.phone);
-    const phoneHtml = link
-      ? `<a class="cphone wa" href="${link}" target="_blank" rel="noopener">${svgMsg()}${c.phone}</a>`
-      : `<span class="cphone">${svgMsg()}${c.phone}</span>`;
     return `<li class="contact-row ${s===4?'done':''} ${ni?'not-interested':''}" data-id="${c.id}">
       <div class="cinfo">
         <div class="cname-row">
           <span class="cname"></span>
-          <button class="edit-btn" data-id="${c.id}" title="Editar empresa / responsável">✎</button>
+          <button class="edit-btn" data-id="${c.id}" title="Editar empresa / responsável / telefone">✎</button>
           <button class="del-btn" data-id="${c.id}" title="Excluir contato">🗑</button>
         </div>
         <span class="cresp"></span>
-        <div class="cphone-row">${phoneHtml}</div>
+        <div class="cphone-row">${buildPhoneHtml(c.id)}</div>
       </div>
       <div class="stage-track">
         ${[1,2,3,4].map(n=>segButton(c,n)).join('')}
@@ -1258,6 +1277,7 @@
     const respEl = row.querySelector('.cresp');
     respEl.textContent = resp ? `Responsável: ${resp}` : '';
     respEl.style.display = resp ? 'block' : 'none';
+    row.querySelector('.cphone-row').innerHTML = buildPhoneHtml(id);
   }
 
   function startApp(){
@@ -1348,9 +1368,10 @@
   function openEditModal(id){
     editingId = id;
     const c = DATA_BY_ID.get(id);
-    document.getElementById('editOriginalName').textContent = `Nome original: ${c.name}`;
+    document.getElementById('editOriginalName').textContent = `Original: ${c.name} · ${c.phone}`;
     document.getElementById('editEmpresa').value = getDisplayName(id);
     document.getElementById('editResponsavel').value = getResponsavel(id);
+    document.getElementById('editPhone').value = getDisplayPhone(id);
     document.getElementById('editModal').style.display = 'flex';
     document.getElementById('editEmpresa').focus();
   }
@@ -1363,21 +1384,27 @@
     const c = DATA_BY_ID.get(editingId);
     const empresa = document.getElementById('editEmpresa').value.trim();
     const responsavel = document.getElementById('editResponsavel').value.trim();
-    if(!empresa || (empresa === c.name && !responsavel)){
+    const phoneRaw = document.getElementById('editPhone').value.trim();
+
+    const country = getContactCountry(editingId);
+    const normalizedPhone = phoneRaw ? normalizePhoneByCountry(phoneRaw, country) : c.phone;
+
+    const empresaDiffers = !!empresa && empresa !== c.name;
+    const phoneDiffers = normalizedPhone !== c.phone;
+    const hasResponsavel = !!responsavel;
+
+    if(!empresaDiffers && !phoneDiffers && !hasResponsavel){
       delete edits[editingId]; // back to original, nothing to store
     }else{
-      edits[editingId] = { empresa: empresa || c.name, responsavel };
+      const entry = {};
+      if(empresaDiffers) entry.empresa = empresa;
+      if(hasResponsavel) entry.responsavel = responsavel;
+      if(phoneDiffers) entry.phone = normalizedPhone;
+      edits[editingId] = entry;
     }
     const id = editingId;
     closeEditModal();
-    const row = document.querySelector(`.contact-row[data-id="${id}"]`);
-    if(row){
-      row.querySelector('.cname').textContent = getDisplayName(id);
-      const resp = getResponsavel(id);
-      const respEl = row.querySelector('.cresp');
-      respEl.textContent = resp ? `Responsável: ${resp}` : '';
-      respEl.style.display = resp ? 'block' : 'none';
-    }
+    refreshRowContent(id);
     resortAllCities();
     queueSave();
   }
@@ -1388,6 +1415,7 @@
     const c = DATA_BY_ID.get(editingId);
     document.getElementById('editEmpresa').value = c.name;
     document.getElementById('editResponsavel').value = '';
+    document.getElementById('editPhone').value = c.phone;
   });
   document.getElementById('editModal').addEventListener('click', e=>{
     if(e.target.id === 'editModal') closeEditModal();
